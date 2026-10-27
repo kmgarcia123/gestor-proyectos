@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { actualizarTarea, eliminarTarea, type CambiosTarea } from '@/app/(app)/actions';
+import { actualizarTarea, eliminarTarea, recordarAhora, type CambiosTarea } from '@/app/(app)/actions';
 import { ESTADOS, PRIORIDADES, type Fase, type Perfil, type Tarea } from '@/lib/types';
 
 interface Props {
@@ -13,15 +13,26 @@ interface Props {
   onEliminada: (id: string) => void;
 }
 
+/** ISO (UTC) → valor para <input type="datetime-local"> en la hora del navegador. */
+function aLocal(iso: string | null | undefined) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
+}
+
 export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardada, onEliminada }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const [form, setForm] = useState<Tarea | null>(tarea);
   const [pending, start] = useTransition();
   const [error, setError] = useState('');
+  const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
+  const [enviando, startEnvio] = useTransition();
 
   useEffect(() => {
     setForm(tarea);
     setError('');
+    setAviso(null);
     const d = ref.current;
     if (!d) return;
     if (tarea && !d.open) d.showModal();
@@ -41,7 +52,9 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
       prioridad: form.prioridad,
       responsable_id: form.responsable_id,
       fecha_limite: form.fecha_limite,
-      fase_id: form.fase_id
+      fase_id: form.fase_id,
+      recordar_en: form.recordar_en || null,
+      mensaje_recordatorio: form.mensaje_recordatorio || null
     };
     start(async () => {
       try {
@@ -50,6 +63,18 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
         ref.current?.close();
       } catch {
         setError('No se pudo guardar. Revisa tu conexión e intenta de nuevo.');
+      }
+    });
+  }
+
+  function enviarAhora() {
+    if (!tarea || !form) return;
+    setAviso(null);
+    startEnvio(async () => {
+      try {
+        setAviso(await recordarAhora(tarea.id, form.mensaje_recordatorio || ''));
+      } catch {
+        setAviso({ ok: false, texto: 'No se pudo enviar. Intenta de nuevo.' });
       }
     });
   }
@@ -115,6 +140,37 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
           <label className="etiqueta" htmlFor="dt-desc">Descripción</label>
           <textarea id="dt-desc" rows={5} value={form.descripcion || ''} onChange={(e) => set('descripcion', e.target.value)} className="campo" placeholder="Detalles, enlaces, criterios de terminado…" />
         </div>
+
+        <fieldset className="rounded-2xl border border-nube bg-fondo p-4">
+          <legend className="px-1 text-sm font-bold">🔔 Recordatorio</legend>
+          <div className="grid gap-4 sm:grid-cols-[1fr_auto]">
+            <div>
+              <label className="etiqueta" htmlFor="dt-msg">Mensaje para el responsable</label>
+              <input id="dt-msg" value={form.mensaje_recordatorio || ''} onChange={(e) => set('mensaje_recordatorio', e.target.value)} maxLength={300} className="campo" placeholder="Ej.: Por favor haz la tarea antes del viernes 🙏" />
+            </div>
+            <div>
+              <label className="etiqueta" htmlFor="dt-recordar">Recordar el</label>
+              <input
+                id="dt-recordar"
+                type="datetime-local"
+                value={aLocal(form.recordar_en)}
+                onChange={(e) => set('recordar_en', e.target.value ? new Date(e.target.value).toISOString() : null)}
+                className="campo"
+              />
+            </div>
+          </div>
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            <button type="button" onClick={enviarAhora} disabled={enviando || !form.responsable_id} className="btn-suave">
+              {enviando ? 'Enviando…' : 'Recordar ahora'}
+            </button>
+            <p className="text-xs text-slate-500">
+              {form.responsable_id ? 'Llega por correo y/o WhatsApp, según lo que el responsable activó en «Mis notificaciones». «Recordar el» se guarda con el botón Guardar.' : 'Asigna un responsable para poder enviarle recordatorios.'}
+            </p>
+          </div>
+          {aviso && (
+            <p role="status" className={`mt-3 rounded-xl px-3 py-2 text-sm font-medium ${aviso.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>{aviso.texto}</p>
+          )}
+        </fieldset>
 
         {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>}
 

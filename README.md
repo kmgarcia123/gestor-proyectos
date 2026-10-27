@@ -1,6 +1,6 @@
 # Gestor de proyectos
 
-App interna para gestionar proyectos y tareas del equipo, con login de Google, tablero tipo Trello, fases con avance visual y recordatorios automáticos por correo.
+App interna para gestionar proyectos y tareas del equipo, con login de Google, tablero tipo Trello, fases con avance visual y recordatorios automáticos por correo y WhatsApp.
 
 Pensada para uso interno, pero **multi-espacio desde el día 1**: todo pertenece a un *workspace*, así que más adelante puede ofrecerse a clientes sin rehacer la base.
 
@@ -13,9 +13,15 @@ Pensada para uso interno, pero **multi-espacio desde el día 1**: todo pertenece
 - Detalle de tarea: responsable, fecha límite, prioridad, fase, descripción.
 - Recordatorio diario por correo (7:00 a. m. Bogotá): tareas que vencen mañana, hoy o ya vencidas. Un solo correo por persona, sin repetir.
 
+## Fase 2 (incluido)
+
+- **Mis notificaciones** (menú lateral): cada persona elige correo y/o WhatsApp, su celular, la hora del aviso diario, cuántos días antes avisar, si avisar el día que vence, si repetir mientras esté vencida y si quiere un resumen diario de todo lo pendiente. Botones para enviarse una prueba e historial de los últimos envíos (con el motivo si algo falló).
+- En cada tarea, sección **Recordatorio**: mensaje personalizado (“Por favor haz la tarea antes del viernes”), **Recordar el** (fecha y hora) y **Recordar ahora** (le llega al responsable al instante, firmado por quien lo envía).
+- WhatsApp por la **API oficial de Meta** (plantilla aprobada). Un solo mensaje al día por canal; nunca se repite un aviso.
+
 ## Próximas fases
 
-2. WhatsApp (o Telegram) y resumen diario · 3. Calendario, Gantt y panel · 4. Mapa del proyecto que se colorea por fases · 5. Acceso de clientes.
+3. Calendario, Gantt y panel · 4. Mapa del proyecto que se colorea por fases · 5. Acceso de clientes.
 
 ## Tecnología
 
@@ -47,6 +53,20 @@ Next.js 15 · Supabase (Auth Google, Postgres con RLS) · Tailwind · dnd-kit ·
 1. Importe este repositorio en [vercel.com](https://vercel.com).
 2. Agregue las variables de `.env.example` en *Settings → Environment Variables* (`CRON_SECRET`: un texto largo aleatorio).
 3. Deploy. El cron de `vercel.json` llama a `/api/cron/recordatorios` cada día a las 12:00 UTC (7:00 a. m. Colombia); Vercel envía `CRON_SECRET` automáticamente.
+
+### 5. WhatsApp (API oficial de Meta) — Fase 2
+1. En [developers.facebook.com](https://developers.facebook.com) → *Mis apps → Crear app* → tipo **Empresa** → agregue el producto **WhatsApp**.
+2. *WhatsApp → Configuración de la API*: Meta le da un **número de prueba** gratis. Copie el **Identificador del número de teléfono** → variable `WHATSAPP_PHONE_NUMBER_ID`.
+3. En esa misma pantalla, en **Para**, agregue los celulares de los socios (máximo 5 con el número de prueba); a cada uno le llega un código para confirmar.
+4. Token permanente: en [business.facebook.com](https://business.facebook.com) → *Configuración del negocio → Usuarios del sistema* → cree uno (Administrador) → *Asignar activos*: su app (control total) → *Generar token* con los permisos `whatsapp_business_messaging` y `whatsapp_business_management`, caducidad **Nunca** → variable `WHATSAPP_TOKEN` (como **Secret** en Vercel; nunca la pegue en chats ni en el código).
+5. *WhatsApp → Plantillas de mensajes → Crear plantilla*: categoría **Utilidad**, nombre `recordatorio_tareas`, idioma **Español**, cuerpo:
+   `Hola {{1}}, tienes un recordatorio del gestor de proyectos: {{2}}. Ábrelo aquí: {{3}} ¡Gracias!`
+   (Ejemplos para la revisión: `Kevin` · `2 vencidas, 1 para hoy («Cotización Torres del Parque»)` · `https://su-app.vercel.app`). Suele aprobarse en minutos.
+6. En Vercel agregue `WHATSAPP_TOKEN` y `WHATSAPP_PHONE_NUMBER_ID` y vuelva a desplegar. Cada persona activa WhatsApp y escribe su número en **Mis notificaciones**, y prueba con **Probar WhatsApp**.
+7. Cuando quieran enviar desde un número propio (no el de prueba), se agrega en *WhatsApp → Números de teléfono* y se verifica el negocio. Costo aproximado en Colombia: menos de USD 0,001 por mensaje de utilidad.
+
+### 6. Revisión cada 15 minutos — Fase 2
+El cron de Vercel (plan gratis) solo corre una vez al día. Para respetar la hora de cada persona y los “Recordar el”, Supabase llama a la app cada 15 minutos: ejecute `supabase/programar_recordatorios.sql` en *SQL Editor* (después de publicar en producción), con su `CRON_SECRET` y la URL de producción.
 
 ### Desarrollo local
 ```bash
