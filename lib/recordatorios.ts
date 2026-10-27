@@ -84,21 +84,34 @@ export function armarAvisoDiario(p: PerfilAvisos, alertas: { tarea: TareaAviso; 
   const vencidas = alertas.filter((a) => a.tipo === 'vencida').length;
   const hoyN = alertas.filter((a) => a.tipo === 'hoy').length;
   const pronto = alertas.length - vencidas - hoyN;
+  const pl = (n: number, uno: string, varios: string) => `${n} ${n === 1 ? uno : varios}`;
   const partes = [
-    vencidas && `${vencidas} vencida${vencidas > 1 ? 's' : ''}`,
+    vencidas && pl(vencidas, 'tarea vencida', 'tareas vencidas'),
     hoyN && `${hoyN} para hoy`,
     pronto && `${pronto} por vencer`,
-    otras.length && `${otras.length} pendiente${otras.length > 1 ? 's' : ''} más`
+    otras.length && pl(otras.length, 'pendiente', 'pendientes')
   ].filter(Boolean) as string[];
+  const enLista = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : xs[0] || '');
+
+  const chips = [
+    vencidas && { texto: pl(vencidas, 'vencida', 'vencidas'), color: '#B42318', fondo: '#FEF3F2' },
+    hoyN && { texto: `${hoyN} para hoy`, color: '#92400E', fondo: '#FFFBEB' },
+    pronto && { texto: `${pronto} por vencer`, color: '#1B389E', fondo: '#EFF4FF' },
+    otras.length && { texto: pl(otras.length, 'pendiente', 'pendientes'), color: '#475467', fondo: '#F2F4F7' }
+  ].filter(Boolean) as NonNullable<Aviso['chips']>;
+
+  if (alertas.length && otras.length) {
+    lineas.forEach((l, i) => (l.grupo = i < alertas.length ? 'Necesitan atención' : 'Otras pendientes'));
+  }
 
   const titulos = alertas.map((a) => `«${a.tarea.titulo}»`).slice(0, 4).join(', ');
-  const app = process.env.NEXT_PUBLIC_APP_NAME || 'Gestor de proyectos';
   return {
-    asunto: `${partes[0] ? partes[0].charAt(0).toUpperCase() + partes[0].slice(1) : 'Tu resumen'}${partes.length > 1 ? ` y más` : ''} · ${app}`,
+    asunto: `${primerNombre(p)}, tienes ${enLista(partes) || 'tareas pendientes'}`,
     intro: alertas.length ? 'Estas son tus tareas que necesitan atención:' : 'Este es tu resumen de tareas pendientes:',
+    chips,
     lineas,
     enlace: SITIO() || undefined,
-    resumenWhatsApp: `${partes.join(', ')}${titulos ? ` (${titulos}${alertas.length > 4 ? '…' : ''})` : ''}`
+    resumenWhatsApp: `${enLista(partes)}${titulos ? ` (${titulos}${alertas.length > 4 ? '…' : ''})` : ''}`
   };
 }
 
