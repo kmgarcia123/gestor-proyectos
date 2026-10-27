@@ -202,6 +202,17 @@ create policy "comentarios del espacio" on public.comentarios for all
 
 -- correos_autorizados y recordatorios_enviados: sin políticas = solo el servidor (service role) los toca.
 
+-- ---------- Permisos explícitos para la API ----------
+-- (Funciona aunque "Automatically expose new tables" esté desactivado en Supabase.)
+-- Solo usuarios con sesión (authenticated); RLS decide qué filas ve cada uno.
+grant usage on schema public to authenticated, service_role;
+grant select on public.workspaces, public.miembros to authenticated;
+grant select, update on public.perfiles to authenticated;
+grant select, insert, update, delete on public.proyectos, public.fases, public.tareas, public.comentarios to authenticated;
+grant execute on function public.es_miembro(uuid), public.comparte_espacio(uuid) to authenticated;
+grant all on all tables in schema public to service_role;
+grant usage, select on all sequences in schema public to service_role;
+
 -- =====================================================================
 -- DATOS INICIALES: cambie el nombre y los 3 correos antes de ejecutar.
 -- =====================================================================
