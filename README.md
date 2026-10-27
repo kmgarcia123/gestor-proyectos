@@ -45,7 +45,10 @@ Next.js 15 · Supabase (Auth Google, Postgres con RLS) · Tailwind · dnd-kit ·
    - **Site URL:** `https://SU-APP.vercel.app`
    - **Redirect URLs:** `https://SU-APP.vercel.app/auth/callback` y `http://localhost:3000/auth/callback`
 
-### 3. Correos (Resend)
+### 3. Correos
+**Opción Gmail (sin dominio, uso interno):** con la cuenta de Gmail que enviará los avisos, active la verificación en dos pasos y cree una *contraseña de aplicación* en [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords). En Vercel: `GMAIL_USUARIO` (el Gmail) y `GMAIL_CLAVE_APP` (las 16 letras, como Secret). Si están, se usa Gmail en vez de Resend.
+
+**Opción Resend (con dominio propio):**
 1. Cree cuenta en [resend.com](https://resend.com) y una API key.
 2. Para enviar a los 3 socios, verifique su dominio en Resend (cuando lo compren). Mientras tanto, el remitente de prueba `onboarding@resend.dev` solo entrega al correo dueño de la cuenta de Resend.
 

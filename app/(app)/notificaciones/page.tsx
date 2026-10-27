@@ -28,7 +28,7 @@ export default async function Notificaciones() {
     .limit(15);
 
   const whatsappListo = Boolean(process.env.WHATSAPP_TOKEN && process.env.WHATSAPP_PHONE_NUMBER_ID);
-  const correoListo = Boolean(process.env.RESEND_API_KEY);
+  const correoListo = Boolean((process.env.GMAIL_USUARIO && process.env.GMAIL_CLAVE_APP) || process.env.RESEND_API_KEY);
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col gap-8 p-5 sm:p-8">

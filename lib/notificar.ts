@@ -1,4 +1,5 @@
 import { Resend } from 'resend';
+import nodemailer from 'nodemailer';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 /**
@@ -126,20 +127,36 @@ export function htmlAviso(dest: Destinatario, aviso: Aviso) {
 </div>`;
 }
 
+/**
+ * Correo: si están GMAIL_USUARIO y GMAIL_CLAVE_APP se envía desde ese Gmail (sirve sin dominio propio,
+ * hasta ~500 correos al día). Si no, se usa Resend (cuando tengan dominio verificado).
+ */
 export async function enviarCorreo(dest: Destinatario, aviso: Aviso): Promise<Resultado> {
-  if (!process.env.RESEND_API_KEY) return { canal: 'correo', ok: false, detalle: 'Falta configurar RESEND_API_KEY en Vercel' };
+  const html = htmlAviso(dest, aviso);
+  const gmail = process.env.GMAIL_USUARIO;
+  const clave = process.env.GMAIL_CLAVE_APP?.replace(/\s/g, '');
   try {
+    if (gmail && clave) {
+      const transporte = nodemailer.createTransport({ host: 'smtp.gmail.com', port: 465, secure: true, auth: { user: gmail, pass: clave } });
+      const info = await transporte.sendMail({ from: { name: APP(), address: gmail }, to: dest.email, subject: aviso.asunto, html });
+      return { canal: 'correo', ok: true, detalle: `Gmail ${info.messageId || ''}`.trim() };
+    }
+    if (!process.env.RESEND_API_KEY) return { canal: 'correo', ok: false, detalle: 'Falta configurar el correo en Vercel (GMAIL_USUARIO y GMAIL_CLAVE_APP)' };
     const resend = new Resend(process.env.RESEND_API_KEY);
     const { data, error } = await resend.emails.send({
       from: process.env.RECORDATORIOS_REMITENTE || 'Recordatorios <onboarding@resend.dev>',
       to: dest.email,
       subject: aviso.asunto,
-      html: htmlAviso(dest, aviso)
+      html
     });
-    if (error) return { canal: 'correo', ok: false, detalle: error.message };
+    if (error) {
+      const soloDueno = /only send testing emails/i.test(error.message);
+      return { canal: 'correo', ok: false, detalle: soloDueno ? 'Sin dominio propio, Resend solo entrega al dueño de la cuenta. Configure GMAIL_USUARIO y GMAIL_CLAVE_APP en Vercel.' : error.message };
+    }
     return { canal: 'correo', ok: true, detalle: data?.id ? `Resend ${data.id}` : 'Enviado' };
   } catch (e) {
-    return { canal: 'correo', ok: false, detalle: e instanceof Error ? e.message : 'Error desconocido' };
+    const msg = e instanceof Error ? e.message : 'Error desconocido';
+    return { canal: 'correo', ok: false, detalle: /Invalid login|BadCredentials|535/i.test(msg) ? 'Gmail rechazó el usuario o la contraseña de aplicación. Revise GMAIL_USUARIO y GMAIL_CLAVE_APP.' : msg };
   }
 }
 
