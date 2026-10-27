@@ -8,5 +8,5 @@
 # Contexto
 
 App interna de gestión de proyectos y tareas del equipo (3 socios). Multi-espacio desde el inicio para poder ofrecerla a clientes después.
-Stack: Next.js 15 (App Router) · Supabase (Auth Google, Postgres con RLS) · Tailwind · dnd-kit · Resend · Vercel.
+Stack: Next.js 15 (App Router) · Supabase (Auth Google, Postgres con RLS) · Tailwind · dnd-kit · Resend (correo) · WhatsApp Cloud API de Meta · Vercel. Recordatorios: `lib/notificar.ts` (envío) y `lib/recordatorios.ts` (reglas); `/api/cron/recordatorios` la llama Supabase pg_cron cada 15 min.
 Esquema en `supabase/migrations/`. Fases pendientes en el README.

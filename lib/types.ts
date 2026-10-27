@@ -41,6 +41,9 @@ export interface Tarea {
   posicion: number;
   creado_en: string;
   terminado_en: string | null;
+  recordar_en?: string | null;
+  recordatorio_enviado_en?: string | null;
+  mensaje_recordatorio?: string | null;
 }
 
 export const ESTADOS: { id: Estado; nombre: string }[] = [
