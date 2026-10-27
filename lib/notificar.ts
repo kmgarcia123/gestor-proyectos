@@ -110,7 +110,7 @@ export async function enviarCorreo(dest: Destinatario, aviso: Aviso): Promise<Re
 
 /**
  * Envía la plantilla aprobada en Meta. Cuerpo esperado de la plantilla (3 variables):
- *   Hola {{1}}, tienes un recordatorio del gestor de proyectos: {{2}}. Ábrelo aquí: {{3}} ¡Gracias!
+ *   Hola {{1}}, hay una actualización de las tareas asignadas a tu cuenta: {{2}}. Puedes ver el detalle aquí: {{3}} Este es un aviso automático de tu cuenta.
  */
 export async function enviarWhatsApp(dest: Destinatario, aviso: Aviso): Promise<Resultado> {
   const token = process.env.WHATSAPP_TOKEN;
@@ -125,7 +125,7 @@ export async function enviarWhatsApp(dest: Destinatario, aviso: Aviso): Promise<
     to: telefono,
     type: 'template',
     template: {
-      name: process.env.WHATSAPP_PLANTILLA || 'recordatorio_tareas',
+      name: process.env.WHATSAPP_PLANTILLA || 'recordatorio_tareas_es',
       language: { code: process.env.WHATSAPP_IDIOMA || 'es' },
       components: [
         {

@@ -59,9 +59,9 @@ Next.js 15 · Supabase (Auth Google, Postgres con RLS) · Tailwind · dnd-kit ·
 2. *WhatsApp → Configuración de la API*: Meta le da un **número de prueba** gratis. Copie el **Identificador del número de teléfono** → variable `WHATSAPP_PHONE_NUMBER_ID`.
 3. En esa misma pantalla, en **Para**, agregue los celulares de los socios (máximo 5 con el número de prueba); a cada uno le llega un código para confirmar.
 4. Token permanente: en [business.facebook.com](https://business.facebook.com) → *Configuración del negocio → Usuarios del sistema* → cree uno (Administrador) → *Asignar activos*: su app (control total) → *Generar token* con los permisos `whatsapp_business_messaging` y `whatsapp_business_management`, caducidad **Nunca** → variable `WHATSAPP_TOKEN` (como **Secret** en Vercel; nunca la pegue en chats ni en el código).
-5. *WhatsApp → Plantillas de mensajes → Crear plantilla*: categoría **Utilidad**, nombre `recordatorio_tareas`, idioma **Español**, cuerpo:
-   `Hola {{1}}, tienes un recordatorio del gestor de proyectos: {{2}}. Ábrelo aquí: {{3}} ¡Gracias!`
-   (Ejemplos para la revisión: `Kevin` · `2 vencidas, 1 para hoy («Cotización Torres del Parque»)` · `https://su-app.vercel.app`). Suele aprobarse en minutos.
+5. *WhatsApp Manager → Plantillas de mensajes → Crear plantilla*: categoría **Utilidad → Predeterminada**, nombre `recordatorio_tareas_es`, idioma **Español** (revíselo: por defecto sale inglés), cuerpo:
+   `Hola {{1}}, hay una actualización de las tareas asignadas a tu cuenta: {{2}}. Puedes ver el detalle aquí: {{3}} Este es un aviso automático de tu cuenta.`
+   (Ejemplos: `Kevin` · `la tarea «Cotización Torres del Parque» vence hoy` · `https://su-app.vercel.app`). Con textos genéricos Meta la clasifica como Marketing: use esta redacción. En Vercel: `WHATSAPP_PLANTILLA=recordatorio_tareas_es`.
 6. En Vercel agregue `WHATSAPP_TOKEN` y `WHATSAPP_PHONE_NUMBER_ID` y vuelva a desplegar. Cada persona activa WhatsApp y escribe su número en **Mis notificaciones**, y prueba con **Probar WhatsApp**.
 7. Cuando quieran enviar desde un número propio (no el de prueba), se agrega en *WhatsApp → Números de teléfono* y se verifica el negocio. Costo aproximado en Colombia: menos de USD 0,001 por mensaje de utilidad.
 
