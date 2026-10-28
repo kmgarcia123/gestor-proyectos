@@ -1,3 +1,4 @@
+import { NOMBRE_APP } from '@/lib/marca';
 import { Resend } from 'resend';
 import nodemailer from 'nodemailer';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -45,7 +46,7 @@ export interface Resultado {
   detalle: string;
 }
 
-const APP = () => process.env.NEXT_PUBLIC_APP_NAME || 'Gestor de proyectos';
+const APP = () => NOMBRE_APP;
 /** URL de la app. En vistas previas de Vercel usa el enlace de la rama, para que los botones abran la versión que se está probando. */
 export const SITIO = () => {
   if (process.env.VERCEL_ENV === 'preview' && process.env.VERCEL_BRANCH_URL) return `https://${process.env.VERCEL_BRANCH_URL}`;

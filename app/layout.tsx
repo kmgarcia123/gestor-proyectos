@@ -1,8 +1,9 @@
+import { NOMBRE_APP } from '@/lib/marca';
 import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: process.env.NEXT_PUBLIC_APP_NAME || 'Gestor de proyectos',
+  title: NOMBRE_APP,
   description: 'Gestión interna de proyectos y tareas'
 };
 
