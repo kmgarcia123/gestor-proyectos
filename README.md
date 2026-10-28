@@ -25,8 +25,9 @@ Pensada para uso interno, pero **multi-espacio desde el día 1**: todo pertenece
 - **Fecha de inicio** (la tarjeta muestra «Inicia …» si es futura) y **fecha y hora de creación** con quién la creó.
 - **«+ Agregar tarea» arriba** de cada columna; las nuevas quedan de primeras.
 - **Aviso inmediato al asignar** a alguien (correo y/o WhatsApp según sus preferencias).
-- **Mapa de fases en árbol** (pestaña del proyecto): fases y subfases como cuadros conectados, coloreados por avance; se agregan, renombran, mueven y eliminan; estado manual opcional. Tocar un cuadro filtra el tablero por esa fase (incluye sus subfases).
-- Base de datos: `supabase/migrations/0003_responsables_fechas_mapa.sql`.
+- **Lista de pasos** dentro de cada tarea (opcional): mini pasos para chulear; se guarda al instante y la tarjeta muestra «☑ 2/5».
+- **Mapa de fases** (pestaña del proyecto): fases y subfases como cuadros conectados con líneas, coloreados por avance. Los cuadros se **arrastran** a cualquier parte (se mueven con sus subfases) y hay «Ordenar automáticamente». Se agregan, editan y eliminan; estado manual opcional. Clic en un cuadro filtra el tablero por esa fase.
+- Base de datos: `supabase/migrations/0003_responsables_fechas_mapa.sql` y `0004_pasos_y_mapa_libre.sql`.
 
 ## Próximas fases
 

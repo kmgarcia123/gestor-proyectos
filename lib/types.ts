@@ -29,6 +29,16 @@ export interface Fase {
   posicion: number;
   parent_id?: string | null;
   estado_manual?: EstadoFase | null;
+  /** Posición libre en el mapa; vacía = ubicación automática. */
+  pos_x?: number | null;
+  pos_y?: number | null;
+}
+
+/** Un mini paso de la lista de una tarea. */
+export interface Paso {
+  id: string;
+  texto: string;
+  hecho: boolean;
 }
 
 export interface Tarea {
@@ -44,6 +54,7 @@ export interface Tarea {
   /** Todos los responsables (el primero es el principal). */
   responsables: string[];
   fecha_inicio?: string | null;
+  pasos?: Paso[];
   fecha_limite: string | null;
   posicion: number;
   creado_en: string;

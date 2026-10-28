@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { actualizarTarea, eliminarTarea, recordarAhora, type CambiosTarea } from '@/app/(app)/actions';
+import { actualizarTarea, eliminarTarea, guardarPasos, recordarAhora, type CambiosTarea } from '@/app/(app)/actions';
+import ListaPasos from '@/components/ListaPasos';
 import SelectorResponsables from '@/components/SelectorResponsables';
 import { aplanar } from '@/lib/fases';
-import { ESTADOS, PRIORIDADES, type Fase, type Perfil, type Tarea } from '@/lib/types';
+import { ESTADOS, PRIORIDADES, type Fase, type Paso, type Perfil, type Tarea } from '@/lib/types';
 
 interface Props {
   tarea: Tarea | null;
@@ -86,6 +87,18 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
     });
   }
 
+  function cambiarPasos(pasos: Paso[]) {
+    if (!tarea || !form) return;
+    const anterior = form.pasos || [];
+    setForm({ ...form, pasos });
+    onGuardada({ ...tarea, pasos });
+    guardarPasos(tarea.id, pasos).catch(() => {
+      setForm((f) => (f ? { ...f, pasos: anterior } : f));
+      onGuardada({ ...tarea, pasos: anterior });
+      setError('No se pudo guardar la lista de pasos. Revisa tu conexión.');
+    });
+  }
+
   function borrar() {
     if (!tarea) return;
     start(async () => {
@@ -144,6 +157,8 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
           <p className="etiqueta">Responsables</p>
           <SelectorResponsables equipo={equipo} valor={form.responsables || []} onCambio={(ids) => set('responsables', ids)} />
         </div>
+
+        <ListaPasos key={tarea?.id} pasos={form.pasos || []} onCambio={cambiarPasos} />
 
         <div>
           <label className="etiqueta" htmlFor="dt-desc">Descripción</label>

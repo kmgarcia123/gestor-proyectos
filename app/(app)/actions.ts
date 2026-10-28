@@ -7,7 +7,7 @@ import { getContexto } from '@/lib/datos';
 import { canalesActivos, notificar } from '@/lib/notificar';
 import { armarAvisoAsignada, armarAvisoTarea, CAMPOS_PERFIL, type PerfilAvisos } from '@/lib/recordatorios';
 import { createAdminClient } from '@/lib/supabase/admin';
-import type { Estado, EstadoFase, Prioridad } from '@/lib/types';
+import type { Estado, EstadoFase, Paso, Prioridad } from '@/lib/types';
 
 function limpiar(texto: FormDataEntryValue | null, max = 500) {
   return String(texto || '').trim().slice(0, max);
@@ -107,6 +107,21 @@ export async function intercambiarFases(a: { id: string; posicion: number }, b: 
   if (data) revalidatePath(`/proyectos/${data.proyecto_id}`);
 }
 
+/** Guarda dónde quedó cada cuadro en el mapa (null = volver a la ubicación automática). */
+export async function guardarPosiciones(proyectoId: string, posiciones: { id: string; x: number | null; y: number | null }[]) {
+  const { supabase } = await getContexto();
+  const n = (v: number | null) => (v === null || !Number.isFinite(v) ? null : Math.max(0, Math.min(20000, Math.round(v))));
+  await Promise.all(posiciones.slice(0, 300).map((p) => supabase.from('fases').update({ pos_x: n(p.x), pos_y: n(p.y) }).eq('id', p.id).eq('proyecto_id', proyectoId)));
+  revalidatePath(`/proyectos/${proyectoId}`);
+}
+
+/** Vuelve a ordenar todo el mapa en forma de árbol automático. */
+export async function ordenarMapa(proyectoId: string) {
+  const { supabase } = await getContexto();
+  await supabase.from('fases').update({ pos_x: null, pos_y: null }).eq('proyecto_id', proyectoId);
+  revalidatePath(`/proyectos/${proyectoId}`);
+}
+
 export async function eliminarFase(id: string) {
   const { supabase } = await getContexto();
   // Las subfases se eliminan en cascada; las tareas quedan "sin fase".
@@ -194,6 +209,19 @@ export async function actualizarTarea(id: string, cambios: CambiosTarea) {
   }
   revalidatePath(`/proyectos/${data.proyecto_id}`);
   revalidatePath('/');
+}
+
+/** Guarda la lista de pasos de una tarea (se llama cada vez que se agrega, marca o borra un paso). */
+export async function guardarPasos(tareaId: string, pasos: Paso[]) {
+  const { supabase } = await getContexto();
+  const limpios = (Array.isArray(pasos) ? pasos : [])
+    .slice(0, 60)
+    .map((p) => ({ id: String(p.id || '').slice(0, 40) || crypto.randomUUID(), texto: String(p.texto || '').trim().slice(0, 200), hecho: Boolean(p.hecho) }))
+    .filter((p) => p.texto);
+  const { data, error } = await supabase.from('tareas').update({ pasos: limpios }).eq('id', tareaId).select('proyecto_id').single();
+  if (error) throw new Error(error.message);
+  revalidatePath(`/proyectos/${data.proyecto_id}`);
+  return limpios;
 }
 
 /** Envía a las personas recién asignadas un aviso inmediato (después de responder, para no demorar la pantalla). */

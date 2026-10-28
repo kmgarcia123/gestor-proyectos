@@ -38,6 +38,15 @@ export function ContenidoTarjeta({ t, responsables, fase }: { t: Tarea; responsa
             {formatoCorto(t.fecha_limite)}
           </span>
         )}
+        {(t.pasos || []).length > 0 && (() => {
+          const ps = t.pasos!;
+          const h = ps.filter((x) => x.hecho).length;
+          return (
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${h === ps.length ? 'bg-turquesa-suave text-turquesa-oscuro' : 'bg-slate-100 text-slate-600'}`} title="Pasos hechos">
+              ☑ {h}/{ps.length}
+            </span>
+          );
+        })()}
         <span className="ml-auto">
           <GrupoAvatares personas={responsables} size={24} />
         </span>

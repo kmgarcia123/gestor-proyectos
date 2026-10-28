@@ -16,17 +16,3 @@ body { @apply bg-fondo text-carbon antialiased; }
   .tarjeta { @apply rounded-2xl bg-white shadow-suave; }
 }
 
-/* ---------- Mapa de fases en árbol (líneas que conectan los cuadros) ---------- */
-.arbol ul { position: relative; display: flex; justify-content: center; padding-top: 22px; }
-.arbol li { position: relative; list-style: none; display: flex; flex-direction: column; align-items: center; padding: 22px 8px 0; }
-.arbol li::before, .arbol li::after { content: ''; position: absolute; top: 0; right: 50%; width: 50%; height: 22px; border-top: 2px solid #CBD5E1; }
-.arbol li::after { right: auto; left: 50%; border-left: 2px solid #CBD5E1; }
-.arbol li:only-child::before, .arbol li:only-child::after { display: none; }
-.arbol li:only-child { padding-top: 0; }
-.arbol li:first-child::before, .arbol li:last-child::after { border: 0 none; }
-.arbol li:last-child::before { border-right: 2px solid #CBD5E1; border-radius: 0 10px 0 0; }
-.arbol li:first-child::after { border-radius: 10px 0 0 0; }
-.arbol ul ul::before { content: ''; position: absolute; top: 0; left: 50%; height: 22px; border-left: 2px solid #CBD5E1; }
-.arbol > ul { padding-top: 0; }
-.arbol > ul > li { padding-top: 0; }
-.arbol > ul > li::before, .arbol > ul > li::after { display: none; }
