@@ -1,4 +1,4 @@
-# Gestor de proyectos
+# TEGGNAR Gestor · gestor de proyectos
 
 App interna para gestionar proyectos y tareas del equipo, con login de Google, tablero tipo Trello, fases con avance visual y recordatorios automáticos por correo y WhatsApp.
 

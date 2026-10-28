@@ -1,3 +1,4 @@
+import { NOMBRE_APP } from '@/lib/marca';
 import Avatar from '@/components/Avatar';
 import NavProyectos from '@/components/NavProyectos';
 import NuevoProyecto from '@/components/NuevoProyecto';
@@ -7,7 +8,7 @@ export const dynamic = 'force-dynamic';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const { yo, proyectos, workspaceNombre } = await getContexto();
-  const app = process.env.NEXT_PUBLIC_APP_NAME || 'Gestor de proyectos';
+  const app = NOMBRE_APP;
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       <aside className="flex shrink-0 flex-col gap-6 bg-carbon p-4 text-white lg:sticky lg:top-0 lg:h-screen lg:w-64">

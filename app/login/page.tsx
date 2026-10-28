@@ -1,10 +1,11 @@
+import { NOMBRE_APP } from '@/lib/marca';
 import BotonGoogle from './BotonGoogle';
 
 export const dynamic = 'force-dynamic';
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const { error } = await searchParams;
-  const app = process.env.NEXT_PUBLIC_APP_NAME || 'Gestor de proyectos';
+  const app = NOMBRE_APP;
   return (
     <main className="grid min-h-screen place-items-center bg-carbon px-4">
       <div className="w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-2xl">
