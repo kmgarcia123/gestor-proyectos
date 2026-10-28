@@ -1,16 +1,15 @@
 import { notFound } from 'next/navigation';
 import Avatar from '@/components/Avatar';
-import Tablero from '@/components/Tablero';
-import FasesBarra from '@/components/FasesBarra';
+import ProyectoVista from '@/components/ProyectoVista';
 import { getContexto } from '@/lib/datos';
 import { formatoCorto } from '@/lib/fechas';
 import type { Fase, Tarea } from '@/lib/types';
 
 export const dynamic = 'force-dynamic';
 
-export default async function ProyectoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tarea?: string }> }) {
+export default async function ProyectoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tarea?: string; vista?: string }> }) {
   const { id } = await params;
-  const { tarea: tareaAbierta } = await searchParams;
+  const { tarea: tareaAbierta, vista } = await searchParams;
   const { supabase, equipo, proyectos, yo } = await getContexto();
   const proyecto = proyectos.find((p) => p.id === id);
   if (!proyecto) notFound();
@@ -25,7 +24,7 @@ export default async function ProyectoPage({ params, searchParams }: { params: P
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="border-b border-slate-200 bg-white px-4 py-5 sm:px-8">
+      <header className="bg-white px-4 py-5 sm:px-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="min-w-0">
             <div className="flex items-center gap-2">
@@ -52,9 +51,17 @@ export default async function ProyectoPage({ params, searchParams }: { params: P
             </div>
           </div>
         </div>
-        <FasesBarra proyectoId={id} fases={(fases || []) as Fase[]} tareas={ts} />
       </header>
-      <Tablero proyectoId={id} tareasIniciales={ts} equipo={equipo} fases={(fases || []) as Fase[]} tareaAbiertaId={tareaAbierta} yoId={yo.id} />
+      <ProyectoVista
+        key={id}
+        proyecto={proyecto}
+        tareasIniciales={ts}
+        fases={(fases || []) as Fase[]}
+        equipo={equipo}
+        yoId={yo.id}
+        tareaAbiertaId={tareaAbierta}
+        vistaInicial={vista === 'mapa' ? 'mapa' : 'tablero'}
+      />
     </div>
   );
 }

@@ -2,8 +2,8 @@
 
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import Avatar from '@/components/Avatar';
-import { estadoFecha, formatoCorto } from '@/lib/fechas';
+import GrupoAvatares from '@/components/GrupoAvatares';
+import { estadoFecha, formatoCorto, hoyBogota } from '@/lib/fechas';
 import type { Fase, Perfil, Tarea } from '@/lib/types';
 
 const PRIO: Record<string, { txt: string; cls: string } | undefined> = {
@@ -17,13 +17,19 @@ const FECHA: Record<string, string> = {
   proxima: 'bg-slate-100 text-slate-600'
 };
 
-export function ContenidoTarjeta({ t, responsable, fase }: { t: Tarea; responsable?: Perfil; fase?: Fase }) {
+export function ContenidoTarjeta({ t, responsables, fase }: { t: Tarea; responsables: Perfil[]; fase?: Fase }) {
   const ef = estadoFecha(t.fecha_limite, t.estado === 'hecho');
+  const iniciaLuego = t.fecha_inicio && t.fecha_inicio > hoyBogota() && t.estado !== 'hecho';
   return (
     <>
       {fase && <p className="mb-1 truncate text-[11px] font-semibold uppercase tracking-wide text-slate-400">{fase.nombre}</p>}
       <p className={`text-sm font-semibold leading-snug ${t.estado === 'hecho' ? 'text-slate-400 line-through' : ''}`}>{t.titulo}</p>
-      <div className="mt-3 flex items-center gap-2">
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        {iniciaLuego && (
+          <span className="inline-flex items-center gap-1 rounded-full bg-violet-50 px-2 py-0.5 text-[11px] font-semibold text-violet-700" title="Fecha de inicio">
+            ▶ Inicia {formatoCorto(t.fecha_inicio!)}
+          </span>
+        )}
         {PRIO[t.prioridad] && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${PRIO[t.prioridad]!.cls}`}>{PRIO[t.prioridad]!.txt}</span>}
         {t.fecha_limite && (
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${t.estado === 'hecho' ? 'bg-turquesa-suave text-turquesa-oscuro' : FECHA[ef] || ''}`}>
@@ -32,15 +38,24 @@ export function ContenidoTarjeta({ t, responsable, fase }: { t: Tarea; responsab
             {formatoCorto(t.fecha_limite)}
           </span>
         )}
+        {(t.pasos || []).length > 0 && (() => {
+          const ps = t.pasos!;
+          const h = ps.filter((x) => x.hecho).length;
+          return (
+            <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${h === ps.length ? 'bg-turquesa-suave text-turquesa-oscuro' : 'bg-slate-100 text-slate-600'}`} title="Pasos hechos">
+              ☑ {h}/{ps.length}
+            </span>
+          );
+        })()}
         <span className="ml-auto">
-          <Avatar perfil={responsable} size={24} />
+          <GrupoAvatares personas={responsables} size={24} />
         </span>
       </div>
     </>
   );
 }
 
-export default function TarjetaTarea({ t, responsable, fase, onAbrir }: { t: Tarea; responsable?: Perfil; fase?: Fase; onAbrir: () => void }) {
+export default function TarjetaTarea({ t, responsables, fase, onAbrir }: { t: Tarea; responsables: Perfil[]; fase?: Fase; onAbrir: () => void }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id, data: { tipo: 'tarea', estado: t.estado } });
   return (
     <li
@@ -56,7 +71,7 @@ export default function TarjetaTarea({ t, responsable, fase, onAbrir }: { t: Tar
         className="block w-full cursor-grab rounded-2xl border border-slate-200/70 bg-white p-3.5 text-left shadow-sm transition hover:border-azul/40 hover:shadow-md active:cursor-grabbing"
         aria-label={`Tarea: ${t.titulo}. Clic para abrir, arrastrar para mover.`}
       >
-        <ContenidoTarjeta t={t} responsable={responsable} fase={fase} />
+        <ContenidoTarjeta t={t} responsables={responsables} fase={fase} />
       </button>
     </li>
   );

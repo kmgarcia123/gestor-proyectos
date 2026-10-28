@@ -48,8 +48,8 @@ export async function probarCanal(canal: Canal): Promise<Estado> {
   const yo = p as PerfilAvisos;
   const { data: tareas } = await supabase
     .from('tareas')
-    .select('id, titulo, fecha_limite, proyecto_id, responsable_id, estado, recordar_en, recordatorio_enviado_en, mensaje_recordatorio, proyectos(nombre)')
-    .eq('responsable_id', user.id)
+    .select('id, titulo, fecha_limite, proyecto_id, responsables, estado, recordar_en, recordatorio_enviado_en, mensaje_recordatorio, proyectos(nombre)')
+    .contains('responsables', [user.id])
     .neq('estado', 'hecho')
     .order('fecha_limite', { ascending: true, nullsFirst: false })
     .limit(30);

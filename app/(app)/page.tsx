@@ -18,13 +18,13 @@ export default async function Inicio() {
   const { supabase, yo, workspaceId, proyectos, equipo } = await getContexto();
   const { data } = await supabase
     .from('tareas')
-    .select('id, proyecto_id, titulo, estado, prioridad, responsable_id, fecha_limite, terminado_en')
+    .select('id, proyecto_id, titulo, estado, prioridad, responsables, fecha_limite, terminado_en')
     .eq('workspace_id', workspaceId);
-  const tareas = (data || []) as Pick<Tarea, 'id' | 'proyecto_id' | 'titulo' | 'estado' | 'prioridad' | 'responsable_id' | 'fecha_limite' | 'terminado_en'>[];
+  const tareas = (data || []) as Pick<Tarea, 'id' | 'proyecto_id' | 'titulo' | 'estado' | 'prioridad' | 'responsables' | 'fecha_limite' | 'terminado_en'>[];
 
   const hoy = hoyBogota();
   const hace7 = hoyBogota(-7);
-  const mias = tareas.filter((t) => t.responsable_id === yo.id && t.estado !== 'hecho');
+  const mias = tareas.filter((t) => (t.responsables || []).includes(yo.id) && t.estado !== 'hecho');
   const vencidas = mias.filter((t) => t.fecha_limite && t.fecha_limite < hoy);
   const paraHoy = mias.filter((t) => t.fecha_limite === hoy);
   const terminadasSemana = tareas.filter((t) => t.estado === 'hecho' && t.terminado_en && t.terminado_en.slice(0, 10) >= hace7);
@@ -39,8 +39,8 @@ export default async function Inicio() {
 
   const porPersona = equipo.map((m) => ({
     m,
-    abiertas: tareas.filter((t) => t.responsable_id === m.id && t.estado !== 'hecho').length,
-    vencidas: tareas.filter((t) => t.responsable_id === m.id && t.estado !== 'hecho' && t.fecha_limite && t.fecha_limite < hoy).length
+    abiertas: tareas.filter((t) => (t.responsables || []).includes(m.id) && t.estado !== 'hecho').length,
+    vencidas: tareas.filter((t) => (t.responsables || []).includes(m.id) && t.estado !== 'hecho' && t.fecha_limite && t.fecha_limite < hoy).length
   }));
 
   const kpis = [

@@ -13,7 +13,8 @@ const TIPOS: Record<string, string> = {
   resumen: 'Resumen diario',
   personal: 'Recordatorio programado',
   manual: 'Recordar ahora',
-  prueba: 'Prueba'
+  prueba: 'Prueba',
+  asignada: 'Tarea asignada'
 };
 
 export default async function Notificaciones() {

@@ -27,7 +27,7 @@ interface TareaAviso {
   titulo: string;
   fecha_limite: string | null;
   proyecto_id: string;
-  responsable_id: string;
+  responsables: string[];
   estado: string;
   recordar_en: string | null;
   recordatorio_enviado_en: string | null;
@@ -129,6 +129,23 @@ export function armarAvisoTarea(t: { id: string; proyecto_id: string; titulo: st
   };
 }
 
+/** Aviso inmediato cuando a alguien le asignan una tarea. */
+export function armarAvisoAsignada(
+  t: { id: string; proyecto_id: string; titulo: string; fecha_inicio?: string | null; fecha_limite: string | null; descripcion?: string | null; proyecto?: string | null },
+  deParte: string
+): Aviso {
+  const fechas = [t.fecha_inicio && `inicia ${formatoCorto(t.fecha_inicio)}`, t.fecha_limite && `vence ${formatoCorto(t.fecha_limite)}`].filter(Boolean).join(', ');
+  const desc = (t.descripcion || '').trim();
+  return {
+    asunto: `${deParte} te asignó: ${t.titulo}`,
+    intro: `${deParte} te asignó una tarea${t.proyecto ? ` en ${t.proyecto}` : ''}:`,
+    mensaje: desc ? (desc.length > 280 ? desc.slice(0, 279) + '…' : desc) : null,
+    lineas: [{ etiqueta: fechas ? fechas.charAt(0).toUpperCase() + fechas.slice(1) : 'Nueva tarea', color: '#2246C4', titulo: t.titulo, detalle: t.proyecto || undefined, enlace: enlaceTarea(t) }],
+    enlace: enlaceTarea(t),
+    resumenWhatsApp: `${deParte} te asignó la tarea «${t.titulo}»${fechas ? ` (${fechas})` : ''}`
+  };
+}
+
 export interface ResumenEjecucion {
   fecha: string;
   hora: number;
@@ -146,10 +163,10 @@ export async function procesarRecordatorios(opciones: { soloUsuario?: string } =
   if (opciones.soloUsuario) qPerfiles = qPerfiles.eq('id', opciones.soloUsuario);
   let qTareas = admin
     .from('tareas')
-    .select('id, titulo, fecha_limite, proyecto_id, responsable_id, estado, recordar_en, recordatorio_enviado_en, mensaje_recordatorio, proyectos(nombre, archivado)')
+    .select('id, titulo, fecha_limite, proyecto_id, responsables, estado, recordar_en, recordatorio_enviado_en, mensaje_recordatorio, proyectos(nombre, archivado)')
     .neq('estado', 'hecho')
-    .not('responsable_id', 'is', null);
-  if (opciones.soloUsuario) qTareas = qTareas.eq('responsable_id', opciones.soloUsuario);
+    .neq('responsables', '{}');
+  if (opciones.soloUsuario) qTareas = qTareas.contains('responsables', [opciones.soloUsuario]);
 
   const desde = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
   const [{ data: perfiles, error: e1 }, { data: tareasRaw, error: e2 }, { data: enviados, error: e3 }] = await Promise.all([
@@ -170,7 +187,7 @@ export async function procesarRecordatorios(opciones: { soloUsuario?: string } =
   // ---------- 1. Aviso diario ----------
   for (const p of (perfiles || []) as PerfilAvisos[]) {
     if (hora < p.hora_aviso) continue;
-    const mias = tareas.filter((t) => t.responsable_id === p.id);
+    const mias = tareas.filter((t) => (t.responsables || []).includes(p.id));
     if (!mias.length) continue;
 
     for (const canal of canalesActivos(p)) {
@@ -211,20 +228,20 @@ export async function procesarRecordatorios(opciones: { soloUsuario?: string } =
   const ahora = Date.now();
   const vencidos = tareas.filter((t) => t.recordar_en && new Date(t.recordar_en).getTime() <= ahora && (!t.recordatorio_enviado_en || new Date(t.recordatorio_enviado_en) < new Date(t.recordar_en)));
   for (const t of vencidos) {
-    const p = (perfiles || []).find((x) => x.id === t.responsable_id) as PerfilAvisos | undefined;
-    if (!p) continue;
+    const personas = ((perfiles || []) as PerfilAvisos[]).filter((x) => (t.responsables || []).includes(x.id));
+    if (!personas.length) continue;
     // Se marca primero para que dos ejecuciones simultáneas no lo envíen dos veces.
     let marcar = admin.from('tareas').update({ recordatorio_enviado_en: new Date().toISOString() }).eq('id', t.id).eq('recordar_en', t.recordar_en!);
     marcar = t.recordatorio_enviado_en ? marcar.eq('recordatorio_enviado_en', t.recordatorio_enviado_en) : marcar.is('recordatorio_enviado_en', null);
     const { data: marcada } = await marcar.select('id');
     if (!marcada?.length) continue;
-    const canales = canalesActivos(p);
-    if (!canales.length) {
-      resumen.puntuales.push({ tarea: t.titulo, resultados: [] });
-      continue;
-    }
     const aviso = armarAvisoTarea({ ...t, proyecto: t.proyectos?.nombre }, t.mensaje_recordatorio);
-    resumen.puntuales.push({ tarea: t.titulo, resultados: await notificar(p, aviso, canales, { tipo: 'personal', tareas: [t.id] }) });
+    const resultados: Resultado[] = [];
+    for (const p of personas) {
+      const canales = canalesActivos(p);
+      if (canales.length) resultados.push(...(await notificar(p, aviso, canales, { tipo: 'personal', tareas: [t.id] })));
+    }
+    resumen.puntuales.push({ tarea: t.titulo, resultados });
   }
 
   return resumen;
