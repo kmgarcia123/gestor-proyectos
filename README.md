@@ -19,6 +19,15 @@ Pensada para uso interno, pero **multi-espacio desde el día 1**: todo pertenece
 - En cada tarea, sección **Recordatorio**: mensaje personalizado (“Por favor haz la tarea antes del viernes”), **Recordar el** (fecha y hora) y **Recordar ahora** (le llega al responsable al instante, firmado por quien lo envía).
 - WhatsApp por la **API oficial de Meta** (plantilla aprobada). Un solo mensaje al día por canal; nunca se repite un aviso.
 
+## Fase 3 (incluido)
+
+- **Varios responsables por tarea**: se tocan los avatares del equipo para asignar a una, dos o todas las personas. Avisos y recordatorios les llegan a todos.
+- **Fecha de inicio** (la tarjeta muestra «Inicia …» si es futura) y **fecha y hora de creación** con quién la creó.
+- **«+ Agregar tarea» arriba** de cada columna; las nuevas quedan de primeras.
+- **Aviso inmediato al asignar** a alguien (correo y/o WhatsApp según sus preferencias).
+- **Mapa de fases en árbol** (pestaña del proyecto): fases y subfases como cuadros conectados, coloreados por avance; se agregan, renombran, mueven y eliminan; estado manual opcional. Tocar un cuadro filtra el tablero por esa fase (incluye sus subfases).
+- Base de datos: `supabase/migrations/0003_responsables_fechas_mapa.sql`.
+
 ## Próximas fases
 
 3. Calendario, Gantt y panel · 4. Mapa del proyecto que se colorea por fases · 5. Acceso de clientes.

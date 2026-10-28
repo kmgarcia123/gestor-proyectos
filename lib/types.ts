@@ -20,11 +20,15 @@ export interface Proyecto {
   creado_en: string;
 }
 
+export type EstadoFase = 'pendiente' | 'curso' | 'hecho';
+
 export interface Fase {
   id: string;
   proyecto_id: string;
   nombre: string;
   posicion: number;
+  parent_id?: string | null;
+  estado_manual?: EstadoFase | null;
 }
 
 export interface Tarea {
@@ -37,9 +41,13 @@ export interface Tarea {
   estado: Estado;
   prioridad: Prioridad;
   responsable_id: string | null;
+  /** Todos los responsables (el primero es el principal). */
+  responsables: string[];
+  fecha_inicio?: string | null;
   fecha_limite: string | null;
   posicion: number;
   creado_en: string;
+  creado_por?: string | null;
   terminado_en: string | null;
   recordar_en?: string | null;
   recordatorio_enviado_en?: string | null;

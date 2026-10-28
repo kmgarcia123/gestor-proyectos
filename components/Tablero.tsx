@@ -18,6 +18,7 @@ import TarjetaTarea, { ContenidoTarjeta } from '@/components/TarjetaTarea';
 import DialogoTarea from '@/components/DialogoTarea';
 import { actualizarTarea, crearTarea } from '@/app/(app)/actions';
 import { ESTADOS, type Estado, type Fase, type Perfil, type Tarea } from '@/lib/types';
+import { aplanar, conDescendientes } from '@/lib/fases';
 
 const COLOR_COL: Record<Estado, string> = {
   por_hacer: 'bg-slate-400',
@@ -28,14 +29,17 @@ const COLOR_COL: Record<Estado, string> = {
 
 interface Props {
   proyectoId: string;
-  tareasIniciales: Tarea[];
+  tareas: Tarea[];
+  setTareas: React.Dispatch<React.SetStateAction<Tarea[]>>;
   equipo: Perfil[];
   fases: Fase[];
+  faseFiltro: string;
+  setFaseFiltro: (id: string) => void;
   tareaAbiertaId?: string;
   yoId: string;
 }
 
-function Columna({ estado, nombre, children, total }: { estado: Estado; nombre: string; children: React.ReactNode; total: number }) {
+function Columna({ estado, nombre, children, total, arriba }: { estado: Estado; nombre: string; children: React.ReactNode; total: number; arriba: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${estado}`, data: { tipo: 'columna', estado } });
   return (
     <section aria-label={nombre} className={`flex w-[290px] shrink-0 flex-col rounded-3xl p-3 transition-colors sm:w-auto sm:min-w-0 ${isOver ? 'bg-azul-suave' : 'bg-nube'}`}>
@@ -44,6 +48,7 @@ function Columna({ estado, nombre, children, total }: { estado: Estado; nombre: 
         {nombre}
         <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">{total}</span>
       </h2>
+      {arriba}
       <div ref={setNodeRef} className="flex min-h-[80px] flex-1 flex-col">
         {children}
       </div>
@@ -51,7 +56,7 @@ function Columna({ estado, nombre, children, total }: { estado: Estado; nombre: 
   );
 }
 
-function AgregarRapido({ onAgregar }: { onAgregar: (titulo: string) => Promise<void> }) {
+function AgregarRapido({ onAgregar, id }: { onAgregar: (titulo: string) => Promise<void>; id: string }) {
   const [valor, setValor] = useState('');
   const [pending, start] = useTransition();
   return (
@@ -65,25 +70,29 @@ function AgregarRapido({ onAgregar }: { onAgregar: (titulo: string) => Promise<v
           setValor('');
         });
       }}
-      className="mt-2"
+      className="mb-2.5"
     >
-      <label className="sr-only">Nueva tarea</label>
-      <input value={valor} onChange={(e) => setValor(e.target.value)} disabled={pending} placeholder="+ Agregar tarea" className="w-full rounded-xl border border-transparent bg-transparent px-3 py-2 text-sm placeholder:text-slate-500 hover:bg-white focus:border-azul focus:bg-white focus:outline-none" />
+      <label className="sr-only" htmlFor={id}>Nueva tarea</label>
+      <div className="flex items-center gap-1 rounded-xl border border-dashed border-slate-300 bg-white/60 pr-1 transition focus-within:border-azul focus-within:bg-white hover:bg-white">
+        <span className="pl-3 text-lg font-bold leading-none text-azul" aria-hidden="true">+</span>
+        <input id={id} value={valor} onChange={(e) => setValor(e.target.value)} disabled={pending} placeholder="Agregar tarea" className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-0" />
+        {valor.trim() && <button type="submit" disabled={pending} className="rounded-lg bg-azul px-2.5 py-1 text-xs font-bold text-white">{pending ? '…' : 'Crear'}</button>}
+      </div>
     </form>
   );
 }
 
-export default function Tablero({ proyectoId, tareasIniciales, equipo, fases, tareaAbiertaId, yoId }: Props) {
-  const [tareas, setTareas] = useState<Tarea[]>(tareasIniciales);
-  const [abierta, setAbierta] = useState<Tarea | null>(() => tareasIniciales.find((t) => t.id === tareaAbiertaId) || null);
+export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, faseFiltro, setFaseFiltro, tareaAbiertaId, yoId }: Props) {
+  const [abierta, setAbierta] = useState<Tarea | null>(() => tareas.find((t) => t.id === tareaAbiertaId) || null);
   const [arrastrando, setArrastrando] = useState<Tarea | null>(null);
   const [soloMias, setSoloMias] = useState(false);
-  const [faseFiltro, setFaseFiltro] = useState('');
 
   const porId = useMemo(() => Object.fromEntries(equipo.map((m) => [m.id, m])), [equipo]);
   const fasePorId = useMemo(() => Object.fromEntries(fases.map((f) => [f.id, f])), [fases]);
 
-  const visibles = tareas.filter((t) => (!soloMias || t.responsable_id === yoId) && (!faseFiltro || t.fase_id === faseFiltro));
+  const enFase = useMemo(() => (faseFiltro ? conDescendientes(fases, faseFiltro) : null), [fases, faseFiltro]);
+  const personas = (t: Tarea) => (t.responsables || []).map((id) => porId[id]).filter(Boolean);
+  const visibles = tareas.filter((t) => (!soloMias || (t.responsables || []).includes(yoId)) && (!enFase || (t.fase_id && enFase.has(t.fase_id))));
   const columnas = ESTADOS.map((e) => ({ ...e, tareas: visibles.filter((t) => t.estado === e.id).sort((a, b) => a.posicion - b.posicion) }));
 
   const sensors = useSensors(
@@ -123,9 +132,10 @@ export default function Tablero({ proyectoId, tareasIniciales, equipo, fases, ta
   }
 
   async function agregar(estado: Estado, titulo: string) {
-    const max = Math.max(0, ...tareas.filter((t) => t.estado === estado).map((t) => t.posicion));
-    const nueva = await crearTarea({ proyecto_id: proyectoId, titulo, estado, posicion: max + 1024, fase_id: faseFiltro || null });
-    if (nueva) setTareas((ts) => [...ts, nueva as Tarea]);
+    // Queda de primera en la columna.
+    const min = Math.min(0, ...tareas.filter((t) => t.estado === estado).map((t) => t.posicion));
+    const nueva = await crearTarea({ proyecto_id: proyectoId, titulo, estado, posicion: min - 1024, fase_id: faseFiltro || null });
+    if (nueva) setTareas((ts) => [nueva as Tarea, ...ts]);
   }
 
   return (
@@ -140,7 +150,7 @@ export default function Tablero({ proyectoId, tareasIniciales, equipo, fases, ta
             <label className="sr-only" htmlFor="filtro-fase">Filtrar por fase</label>
             <select id="filtro-fase" value={faseFiltro} onChange={(e) => setFaseFiltro(e.target.value)} className="campo w-auto rounded-full py-2">
               <option value="">Todas las fases</option>
-              {fases.map((f) => <option key={f.id} value={f.id}>{f.nombre}</option>)}
+              {aplanar(fases).map(({ f, nivel }) => <option key={f.id} value={f.id}>{'\u00A0\u00A0'.repeat(nivel) + (nivel ? '└ ' : '') + f.nombre}</option>)}
             </select>
           </div>
         )}
@@ -149,22 +159,21 @@ export default function Tablero({ proyectoId, tareasIniciales, equipo, fases, ta
       <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={alIniciar} onDragEnd={alSoltar} onDragCancel={() => setArrastrando(null)}>
         <div className="flex flex-1 gap-4 overflow-x-auto pb-4 sm:grid sm:grid-cols-2 sm:overflow-visible xl:grid-cols-4">
           {columnas.map((c) => (
-            <Columna key={c.id} estado={c.id} nombre={c.nombre} total={c.tareas.length}>
+            <Columna key={c.id} estado={c.id} nombre={c.nombre} total={c.tareas.length} arriba={<AgregarRapido id={`nueva-${c.id}`} onAgregar={(titulo) => agregar(c.id, titulo)} />}>
               <SortableContext items={c.tareas.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 <ul className="flex flex-col gap-2.5">
                   {c.tareas.map((t) => (
-                    <TarjetaTarea key={t.id} t={t} responsable={t.responsable_id ? porId[t.responsable_id] : undefined} fase={t.fase_id ? fasePorId[t.fase_id] : undefined} onAbrir={() => setAbierta(t)} />
+                    <TarjetaTarea key={t.id} t={t} responsables={personas(t)} fase={t.fase_id ? fasePorId[t.fase_id] : undefined} onAbrir={() => setAbierta(t)} />
                   ))}
                 </ul>
               </SortableContext>
-              <AgregarRapido onAgregar={(titulo) => agregar(c.id, titulo)} />
             </Columna>
           ))}
         </div>
         <DragOverlay>
           {arrastrando && (
             <div className="rotate-2 rounded-2xl border border-azul/40 bg-white p-3.5 shadow-xl">
-              <ContenidoTarjeta t={arrastrando} responsable={arrastrando.responsable_id ? porId[arrastrando.responsable_id] : undefined} fase={arrastrando.fase_id ? fasePorId[arrastrando.fase_id] : undefined} />
+              <ContenidoTarjeta t={arrastrando} responsables={personas(arrastrando)} fase={arrastrando.fase_id ? fasePorId[arrastrando.fase_id] : undefined} />
             </div>
           )}
         </DragOverlay>
