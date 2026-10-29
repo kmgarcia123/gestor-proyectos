@@ -34,6 +34,7 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
   const [form, setForm] = useState<Tarea | null>(tarea);
   const [pending, start] = useTransition();
   const [error, setError] = useState('');
+  const [confirmarBorrado, setConfirmarBorrado] = useState(false);
   const [aviso, setAviso] = useState<{ ok: boolean; texto: string } | null>(null);
   const [enviando, startEnvio] = useTransition();
 
@@ -41,6 +42,7 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
     setForm(tarea);
     setError('');
     setAviso(null);
+    setConfirmarBorrado(false);
     const d = ref.current;
     if (!d) return;
     if (tarea && !d.open) d.showModal();
@@ -106,6 +108,8 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
 
   function borrar() {
     if (!tarea) return;
+    // Lo que no tiene vuelta atrás pide un segundo toque que dice exactamente qué va a pasar.
+    if (!confirmarBorrado) return setConfirmarBorrado(true);
     start(async () => {
       await eliminarTarea(tarea.id);
       onEliminada(tarea.id);
@@ -125,7 +129,7 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
         <div className="flex items-start gap-3">
           <label htmlFor="dt-titulo" className="sr-only">Título</label>
           <input id="dt-titulo" value={form.titulo} onChange={(e) => set('titulo', e.target.value)} required maxLength={200} className="w-full rounded-lg border-0 bg-transparent px-0 text-xl font-extrabold tracking-tight focus:ring-0" />
-          <button type="button" onClick={() => ref.current?.close()} className="btn-suave h-9 min-h-0 w-9 shrink-0 px-0" aria-label="Cerrar">✕</button>
+          <button type="button" onClick={() => ref.current?.close()} className="btn-icono" aria-label="Cerrar">✕</button>
         </div>
 
         <div>
@@ -244,13 +248,27 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
 
         {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>}
 
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <button type="button" onClick={borrar} disabled={pending} className="btn-peligro">Eliminar</button>
-          <div className="flex gap-2">
-            <button type="button" onClick={() => ref.current?.close()} className="btn-suave">Cancelar</button>
-            <button type="submit" disabled={pending} className="btn-primario">{pending ? 'Guardando…' : 'Guardar'}</button>
+        {confirmarBorrado ? (
+          <div className="flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4" role="alertdialog" aria-label="Confirmar eliminación">
+            <p className="text-sm text-red-800">
+              Se elimina «{form.titulo}»{(tarea?.adjuntos_total || 0) > 0 ? ' con sus archivos adjuntos' : ''}. Esto no se puede deshacer.
+            </p>
+            <div className="flex flex-wrap items-center gap-2">
+              <button type="button" onClick={borrar} disabled={pending} className="btn-destructivo bg-white">
+                {pending ? 'Eliminando…' : 'Eliminar tarea definitivamente'}
+              </button>
+              <button type="button" onClick={() => setConfirmarBorrado(false)} className="btn-ghost">Conservar tarea</button>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="pie-acciones">
+            <button type="submit" disabled={pending} className="btn-primario">{pending ? 'Guardando…' : 'Guardar cambios'}</button>
+            <button type="button" onClick={() => ref.current?.close()} className="btn-ghost">Cerrar sin guardar</button>
+            <div className="separador-destructivo">
+              <button type="button" onClick={borrar} disabled={pending} className="btn-destructivo">Eliminar tarea</button>
+            </div>
+          </div>
+        )}
       </form>
     </dialog>
   );

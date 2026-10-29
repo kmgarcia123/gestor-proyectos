@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { actualizarFase, crearFase, eliminarFase, guardarPosiciones, intercambiarFases, ordenarMapa } from '@/app/(app)/actions';
+import { actualizarFase, crearFase, eliminarFase, guardarPosiciones, guardarPosicionProyecto, intercambiarFases, ordenarMapa } from '@/app/(app)/actions';
 import { aplanar, avanceFase, conDescendientes, hijosPorPadre } from '@/lib/fases';
 import type { EstadoFase, Fase, Proyecto, Tarea } from '@/lib/types';
 
@@ -64,21 +64,71 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
   const lienzo = useRef<HTMLDivElement>(null);
   // Posiciones mientras se arrastra (antes de guardarlas).
   const [temporal, setTemporal] = useState<Map<string, Punto>>(new Map());
+  // Posiciones ya soltadas que todavía no llegan de la base: se respetan para que el cuadro no "salte" atrás.
+  const [fijas, setFijas] = useState<Map<string, Punto>>(new Map());
+  const ultimas = useRef<Map<string, Punto>>(new Map());
+  // Cuadro principal (proyecto): posición mientras se arrastra y la ya soltada que aún no llega de la base.
+  const [raizTemporal, setRaizTemporal] = useState<Punto | null>(null);
+  const [raizFija, setRaizFija] = useState<Punto | null>(null);
+  const arrastreRaiz = useRef<{ inicio: Punto; origen: Punto; movio: boolean; ultima: Punto | null } | null>(null);
   const arrastre = useRef<{ id: string; ids: string[]; inicio: Punto; origen: Map<string, Punto>; movio: boolean } | null>(null);
   const hijos = hijosPorPadre(fases);
 
   const auto = layoutAutomatico(fases);
-  const posDe = (f: Fase): Punto => temporal.get(f.id) || (f.pos_x != null && f.pos_y != null ? { x: f.pos_x, y: f.pos_y } : auto.pos.get(f.id) || { x: MARGEN, y: MARGEN });
-  const posiciones = new Map(fases.map((f) => [f.id, posDe(f)]));
-  const libres = fases.some((f) => f.pos_x != null);
+  const raiz: Punto =
+    raizTemporal || raizFija || (proyecto.mapa_x != null && proyecto.mapa_y != null ? { x: proyecto.mapa_x, y: proyecto.mapa_y } : auto.raiz);
+  const posDe = (f: Fase): Punto =>
+    temporal.get(f.id) || fijas.get(f.id) || (f.pos_x != null && f.pos_y != null ? { x: f.pos_x, y: f.pos_y } : auto.pos.get(f.id) || { x: MARGEN, y: MARGEN });
 
-  const anchoLienzo = Math.max(auto.raiz.x + RAIZ_W, ...[...posiciones.values()].map((p) => p.x + W)) + MARGEN;
-  const altoLienzo = Math.max(auto.raiz.y + RAIZ_H, ...[...posiciones.values()].map((p) => p.y + H)) + MARGEN;
+  // Cuando la base ya trae la posición guardada, se suelta la copia local.
+  useEffect(() => {
+    if (!fijas.size) return;
+    const sigue = new Map(fijas);
+    for (const f of fases) {
+      const p = sigue.get(f.id);
+      if (p && f.pos_x != null && f.pos_y != null && Math.abs(f.pos_x - p.x) < 2 && Math.abs(f.pos_y - p.y) < 2) sigue.delete(f.id);
+    }
+    if (sigue.size !== fijas.size) setFijas(sigue);
+  }, [fases, fijas]);
+  const posiciones = new Map(fases.map((f) => [f.id, posDe(f)]));
+  const libres = fases.some((f) => f.pos_x != null) || fijas.size > 0 || proyecto.mapa_x != null || raizFija !== null;
+
+  useEffect(() => {
+    if (raizFija && proyecto.mapa_x != null && proyecto.mapa_y != null && Math.abs(proyecto.mapa_x - raizFija.x) < 2 && Math.abs(proyecto.mapa_y - raizFija.y) < 2) setRaizFija(null);
+  }, [proyecto.mapa_x, proyecto.mapa_y, raizFija]);
+
+  function raizPresionar(e: React.PointerEvent) {
+    if ((e.target as HTMLElement).closest('[data-accion]')) return;
+    arrastreRaiz.current = { inicio: { x: e.clientX, y: e.clientY }, origen: raiz, movio: false, ultima: null };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+  function raizMover(e: React.PointerEvent) {
+    const a = arrastreRaiz.current;
+    if (!a) return;
+    const dx = e.clientX - a.inicio.x;
+    const dy = e.clientY - a.inicio.y;
+    if (!a.movio && Math.hypot(dx, dy) < 5) return;
+    a.movio = true;
+    a.ultima = { x: Math.round(Math.max(0, a.origen.x + dx)), y: Math.round(Math.max(0, a.origen.y + dy)) };
+    setRaizTemporal(a.ultima);
+  }
+  function raizSoltar() {
+    const a = arrastreRaiz.current;
+    arrastreRaiz.current = null;
+    if (!a || !a.movio || !a.ultima) return;
+    const p = a.ultima;
+    setRaizFija(p);
+    setRaizTemporal(null);
+    guardarPosicionProyecto(proyecto.id, p.x, p.y).catch(() => setRaizFija(null));
+  }
+
+  const anchoLienzo = Math.max(raiz.x + RAIZ_W, ...[...posiciones.values()].map((p) => p.x + W)) + MARGEN;
+  const altoLienzo = Math.max(raiz.y + RAIZ_H, ...[...posiciones.values()].map((p) => p.y + H)) + MARGEN;
 
   // En pantallas angostas, arrancar con el proyecto (la raíz) centrado.
   useEffect(() => {
     const el = lienzo.current;
-    if (el && el.scrollWidth > el.clientWidth) el.scrollLeft = auto.raiz.x + RAIZ_W / 2 - el.clientWidth / 2;
+    if (el && el.scrollWidth > el.clientWidth) el.scrollLeft = raiz.x + RAIZ_W / 2 - el.clientWidth / 2;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -115,8 +165,9 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
     const sig = new Map<string, Punto>();
     for (const id of a.ids) {
       const o = a.origen.get(id)!;
-      sig.set(id, { x: Math.max(0, o.x + dx), y: Math.max(RAIZ_H / 2, o.y + dy) });
+      sig.set(id, { x: Math.round(Math.max(0, o.x + dx)), y: Math.round(Math.max(RAIZ_H / 2, o.y + dy)) });
     }
+    ultimas.current = sig;
     setTemporal(sig);
   }
   function alSoltar(f: Fase) {
@@ -124,13 +175,24 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
     arrastre.current = null;
     if (!a) return;
     if (!a.movio) return onVerTareas(f.id); // fue un clic: ver sus tareas
-    const finales = temporal;
+    const finales = ultimas.current;
     // Las demás fases que seguían en automático se "congelan" donde están, para que no salten de lugar.
     const resto = fases.filter((x) => !finales.has(x.id) && x.pos_x == null).map((x) => ({ id: x.id, ...posiciones.get(x.id)! }));
     const cambios = [...[...finales.entries()].map(([id, p]) => ({ id, x: p.x, y: p.y })), ...resto];
-    start(async () => {
-      await guardarPosiciones(proyecto.id, cambios);
-      setTemporal(new Map());
+    // Queda donde se soltó de inmediato; se guarda en segundo plano.
+    setFijas((prev) => {
+      const m = new Map(prev);
+      cambios.forEach((c) => m.set(c.id, { x: Math.round(c.x), y: Math.round(c.y) }));
+      return m;
+    });
+    setTemporal(new Map());
+    ultimas.current = new Map();
+    guardarPosiciones(proyecto.id, cambios).catch(() => {
+      setFijas((prev) => {
+        const m = new Map(prev);
+        cambios.forEach((c) => m.delete(c.id));
+        return m;
+      });
     });
   }
 
@@ -205,7 +267,7 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
         <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded border-2 border-turquesa bg-turquesa-suave" />Ejecutada · {conteo.hecho}</span>
         <span className="text-slate-500 sm:ml-auto">Arrastra los cuadros para acomodarlos · Clic para ver sus tareas</span>
         {libres && (
-          <button type="button" disabled={pending} onClick={() => start(() => ordenarMapa(proyecto.id))} className="btn-suave min-h-0 py-1.5 text-xs">
+          <button type="button" disabled={pending} onClick={() => (setFijas(new Map()), setRaizFija(null), start(() => ordenarMapa(proyecto.id)))} className="btn-ghost min-h-0 py-1.5 text-xs">
             Ordenar automáticamente
           </button>
         )}
@@ -216,12 +278,23 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
           <svg className="pointer-events-none absolute inset-0" width={anchoLienzo} height={altoLienzo} aria-hidden="true">
             {fases.map((f) => {
               const padre = f.parent_id ? fases.find((x) => x.id === f.parent_id) : null;
-              const d = padre ? linea(posiciones.get(padre.id)!, W, H, posiciones.get(f.id)!) : linea(auto.raiz, RAIZ_W, RAIZ_H, posiciones.get(f.id)!);
+              const d = padre ? linea(posiciones.get(padre.id)!, W, H, posiciones.get(f.id)!) : linea(raiz, RAIZ_W, RAIZ_H, posiciones.get(f.id)!);
               return <path key={f.id} d={d} fill="none" stroke="#CBD5E1" strokeWidth={2} />;
             })}
           </svg>
 
-          <div className="absolute rounded-2xl bg-carbon p-4 text-white shadow-md" style={{ left: auto.raiz.x, top: auto.raiz.y, width: RAIZ_W, height: RAIZ_H }}>
+          <div
+            onPointerDown={raizPresionar}
+            onPointerMove={raizMover}
+            onPointerUp={raizSoltar}
+            onPointerCancel={() => {
+              arrastreRaiz.current = null;
+              setRaizTemporal(null);
+            }}
+            className={`absolute select-none rounded-2xl bg-carbon p-4 text-white shadow-md ${raizTemporal ? 'z-30 cursor-grabbing shadow-xl' : 'z-10 cursor-grab'}`}
+            style={{ left: raiz.x, top: raiz.y, width: RAIZ_W, height: RAIZ_H, touchAction: 'none' }}
+            title="Arrastra para mover"
+          >
             <div className="flex items-center gap-2">
               <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: proyecto.color }} aria-hidden="true" />
               <p className="truncate font-extrabold">{proyecto.nombre}</p>
@@ -232,7 +305,7 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
               </div>
               <span className="text-xs font-bold">{pctProyecto}%</span>
             </div>
-            <button type="button" onClick={() => setEditor({ modo: 'nueva', padre: null })} className="mt-3 w-full rounded-xl bg-white/10 px-3 py-1.5 text-xs font-bold hover:bg-white/20">
+            <button type="button" data-accion onClick={() => setEditor({ modo: 'nueva', padre: null })} className="mt-3 w-full rounded-xl bg-white/10 px-3 py-1.5 text-xs font-bold hover:bg-white/20">
               + Agregar fase
             </button>
           </div>
@@ -240,7 +313,7 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
           {fases.map((f) => nodo(f))}
 
           {fases.length === 0 && (
-            <p className="absolute max-w-sm text-center text-sm text-slate-500" style={{ left: auto.raiz.x - 40, top: auto.raiz.y + RAIZ_H + 32, width: RAIZ_W + 80 }}>
+            <p className="absolute max-w-sm text-center text-sm text-slate-500" style={{ left: raiz.x - 40, top: raiz.y + RAIZ_H + 32, width: RAIZ_W + 80 }}>
               Aún no hay fases. Agrega la primera (por ejemplo «Diagnóstico» o «Diseño») y luego sus subfases.
             </p>
           )}
@@ -343,20 +416,29 @@ function EditorFase({ editor, fases, proyectoId, onCerrar }: { editor: Editor; f
             </div>
           )}
           {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {editor.modo === 'editar' ? (
-              <button type="button" onClick={borrar} disabled={pending} className="btn-peligro">
-                {confirmar ? (sub ? `Sí, eliminar con ${sub} subfase${sub > 1 ? 's' : ''}` : 'Sí, eliminar') : 'Eliminar'}
-              </button>
-            ) : (
-              <span />
-            )}
-            <div className="flex gap-2">
-              <button type="button" onClick={() => ref.current?.close()} className="btn-suave">Cancelar</button>
-              <button type="submit" disabled={pending} className="btn-primario">{pending ? 'Guardando…' : 'Guardar'}</button>
+          {confirmar && editor.modo === 'editar' ? (
+            <div className="flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4" role="alertdialog" aria-label="Confirmar eliminación">
+              <p className="text-sm text-red-800">
+                Se elimina «{editor.fase.nombre}»{sub ? ` y ${sub} subfase${sub > 1 ? 's' : ''}` : ''}. Sus tareas no se borran: quedan «sin fase».
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={borrar} disabled={pending} className="btn-destructivo bg-white">
+                  {pending ? 'Eliminando…' : sub ? `Eliminar fase y ${sub} subfase${sub > 1 ? 's' : ''}` : 'Eliminar fase definitivamente'}
+                </button>
+                <button type="button" onClick={() => setConfirmar(false)} className="btn-ghost">Conservar fase</button>
+              </div>
             </div>
-          </div>
-          {confirmar && <p className="text-xs text-slate-500">Las tareas de esta fase no se borran: quedan «sin fase».</p>}
+          ) : (
+            <div className="pie-acciones">
+              <button type="submit" disabled={pending} className="btn-primario">{pending ? 'Guardando…' : editor.modo === 'editar' ? 'Guardar cambios' : 'Crear fase'}</button>
+              <button type="button" onClick={() => ref.current?.close()} className="btn-ghost">{editor.modo === 'editar' ? 'Cerrar sin guardar' : 'Cerrar sin crear'}</button>
+              {editor.modo === 'editar' && (
+                <div className="separador-destructivo">
+                  <button type="button" onClick={borrar} disabled={pending} className="btn-destructivo">Eliminar fase</button>
+                </div>
+              )}
+            </div>
+          )}
         </form>
       )}
     </dialog>

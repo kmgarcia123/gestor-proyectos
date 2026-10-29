@@ -116,7 +116,7 @@ export default function ListaPasos({ pasos, onCambio }: { pasos: Paso[]; onCambi
           placeholder={pasos.length ? 'Agregar otro paso y Enter' : 'Escribe el primer paso y Enter'}
           className="min-w-0 flex-1 rounded-lg border border-transparent bg-transparent px-2 py-1.5 text-sm placeholder:text-slate-400 hover:bg-fondo focus:border-azul focus:bg-white focus:outline-none"
         />
-        {nuevo.trim() && <button type="button" onClick={agregar} className="rounded-lg bg-azul px-2.5 py-1 text-xs font-bold text-white">Agregar</button>}
+        {nuevo.trim() && <button type="button" onClick={agregar} className="rounded-lg px-2.5 py-1 text-xs font-bold text-azul hover:bg-nube">Agregar paso</button>}
       </div>
       <p className="mt-2 text-xs text-slate-400">Se guarda solo al marcar, agregar o borrar.</p>
     </div>

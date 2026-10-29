@@ -3,6 +3,7 @@ import Avatar from '@/components/Avatar';
 import MenuMovil from '@/components/MenuMovil';
 import NavProyectos from '@/components/NavProyectos';
 import NuevoProyecto from '@/components/NuevoProyecto';
+import RefrescoGlobal from '@/components/RefrescoGlobal';
 import { getContexto } from '@/lib/datos';
 
 export const dynamic = 'force-dynamic';
@@ -62,6 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {usuario}
       </aside>
       <main className="min-w-0 flex-1">{children}</main>
+      <RefrescoGlobal />
     </div>
   );
 }

@@ -27,7 +27,7 @@ export default function NuevoProyecto({ compacto = false }: { compacto?: boolean
         <form action={crearProyecto} className="flex flex-col gap-4 p-6">
           <div className="flex items-start justify-between">
             <h2 className="text-xl font-extrabold tracking-tight">Nuevo proyecto</h2>
-            <button type="button" onClick={() => ref.current?.close()} className="btn-suave h-9 min-h-0 w-9 px-0" aria-label="Cerrar">✕</button>
+            <button type="button" onClick={() => ref.current?.close()} className="btn-icono" aria-label="Cerrar">✕</button>
           </div>
           <div>
             <label className="etiqueta" htmlFor="np-nombre">Nombre</label>
@@ -57,9 +57,9 @@ export default function NuevoProyecto({ compacto = false }: { compacto?: boolean
               </div>
             </fieldset>
           </div>
-          <div className="mt-2 flex justify-end gap-2">
-            <button type="button" onClick={() => ref.current?.close()} className="btn-suave">Cancelar</button>
+          <div className="pie-acciones mt-2">
             <Enviar />
+            <button type="button" onClick={() => ref.current?.close()} className="btn-ghost">Cerrar sin crear</button>
           </div>
         </form>
       </dialog>

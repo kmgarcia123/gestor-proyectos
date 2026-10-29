@@ -5,8 +5,12 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCorners,
+  pointerWithin,
+  rectIntersection,
+  type CollisionDetection,
   useDroppable,
   useSensor,
   useSensors,
@@ -37,14 +41,14 @@ interface Props {
 function Columna({ estado, nombre, children, total, arriba }: { estado: Estado; nombre: string; children: React.ReactNode; total: number; arriba: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${estado}`, data: { tipo: 'columna', estado } });
   return (
-    <section aria-label={nombre} className={`flex w-[82vw] max-w-[320px] shrink-0 snap-center flex-col rounded-3xl p-3 transition-colors sm:w-auto sm:max-w-none sm:min-w-0 ${isOver ? 'bg-azul-suave' : 'bg-nube'}`}>
+    <section ref={setNodeRef} aria-label={nombre} className={`flex w-[82vw] max-w-[320px] shrink-0 snap-center flex-col rounded-3xl p-3 transition-colors sm:w-auto sm:max-w-none sm:min-w-0 ${isOver ? 'bg-azul-suave' : 'bg-nube'}`}>
       <h2 className="mb-3 flex items-center gap-2 px-1 text-sm font-bold">
         <span className={ESTILO_ESTADO[estado].punto}><IconoEstado e={estado} size={16} /></span>
         {nombre}
         <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">{total}</span>
       </h2>
       {arriba}
-      <div ref={setNodeRef} className="flex min-h-[80px] flex-1 flex-col">
+      <div className="flex min-h-[80px] flex-1 flex-col">
         {children}
       </div>
     </section>
@@ -66,7 +70,7 @@ function AgregarRapido({ onAgregar, id }: { onAgregar: (titulo: string) => void;
       <div className="flex items-center gap-1 rounded-xl border border-dashed border-slate-300 bg-white/60 pr-1 transition focus-within:border-azul focus-within:bg-white hover:bg-white">
         <button type="submit" className="pl-3 text-lg font-bold leading-none text-azul" aria-label="Crear tarea">+</button>
         <input id={id} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Agregar tarea" className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-0" />
-        {valor.trim() && <button type="submit" className="rounded-lg bg-azul px-2.5 py-1 text-xs font-bold text-white">Crear</button>}
+        {valor.trim() && <button type="submit" className="rounded-lg px-2.5 py-1 text-xs font-bold text-azul hover:bg-nube">Continuar</button>}
       </div>
     </form>
   );
@@ -86,10 +90,24 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
   const visibles = tareas.filter((t) => (!soloMias || (t.responsables || []).includes(yoId)) && (!enFase || (t.fase_id && enFase.has(t.fase_id))));
   const columnas = ESTADOS.map((e) => ({ ...e, tareas: visibles.filter((t) => t.estado === e.id).sort((a, b) => a.posicion - b.posicion) }));
 
+  // Mouse: arrastra al moverse 6 px. Dedo: mantener presionado un momento (así se puede deslizar las columnas sin mover tarjetas).
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   );
+
+  // Detección de dónde se suelta: primero lo que está bajo el puntero (tarjeta o columna, aunque esté vacía).
+  const detectar: CollisionDetection = (args) => {
+    const bajoPuntero = pointerWithin(args).filter((c) => c.id !== args.active.id);
+    if (bajoPuntero.length) {
+      const tarjeta = bajoPuntero.find((c) => !String(c.id).startsWith('col:'));
+      return [tarjeta || bajoPuntero[0]];
+    }
+    const cruce = rectIntersection(args).filter((c) => c.id !== args.active.id);
+    if (cruce.length) return cruce;
+    return closestCorners(args).filter((c) => c.id !== args.active.id);
+  };
 
   function alIniciar(e: DragStartEvent) {
     setArrastrando(tareas.find((t) => t.id === e.active.id) || null);
@@ -103,6 +121,7 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
     if (!activa) return;
 
     const overId = String(over.id);
+    if (overId === activa.id) return;
     const destino: Estado = overId.startsWith('col:') ? (overId.slice(4) as Estado) : tareas.find((t) => t.id === overId)?.estado || activa.estado;
     const lista = tareas.filter((t) => t.estado === destino && t.id !== activa.id).sort((a, b) => a.posicion - b.posicion);
     let indice = overId.startsWith('col:') ? lista.length : lista.findIndex((t) => t.id === overId);
@@ -153,7 +172,7 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
         )}
       </div>
 
-      <DndContext id="tablero" sensors={sensors} collisionDetection={closestCorners} onDragStart={alIniciar} onDragEnd={alSoltar} onDragCancel={() => setArrastrando(null)}>
+      <DndContext id="tablero" sensors={sensors} collisionDetection={detectar} onDragStart={alIniciar} onDragEnd={alSoltar} onDragCancel={() => setArrastrando(null)}>
         <div className="-mx-4 flex flex-1 snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 sm:mx-0 sm:grid sm:snap-none sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 xl:grid-cols-4">
           {columnas.map((c) => (
             <Columna key={c.id} estado={c.id} nombre={c.nombre} total={c.tareas.length} arriba={<AgregarRapido id={`nueva-${c.id}`} onAgregar={(titulo) => setNueva({ estado: c.id, titulo })} />}>

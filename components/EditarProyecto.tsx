@@ -57,7 +57,7 @@ export default function EditarProyecto({ proyecto, totalEquipo, hayPendiente }: 
         >
           <div className="flex items-start justify-between">
             <h2 id="ep-titulo" className="text-xl font-extrabold tracking-tight">Editar proyecto</h2>
-            <button type="button" onClick={() => ref.current?.close()} className="btn-suave h-9 min-h-0 w-9 px-0" aria-label="Cerrar">✕</button>
+            <button type="button" onClick={() => ref.current?.close()} className="btn-icono" aria-label="Cerrar">✕</button>
           </div>
           <div>
             <label className="etiqueta" htmlFor="ep-nombre">Nombre</label>
@@ -83,9 +83,9 @@ export default function EditarProyecto({ proyecto, totalEquipo, hayPendiente }: 
             </div>
           </div>
           {aviso && <p role="status" className={`rounded-xl px-3 py-2 text-sm font-medium ${aviso.ok ? 'bg-emerald-50 text-emerald-800' : 'bg-red-50 text-red-700'}`}>{aviso.texto}</p>}
-          <div className="flex justify-end gap-2">
-            <button type="button" onClick={() => ref.current?.close()} className="btn-suave">Cancelar</button>
-            <button type="submit" disabled={pending} className="btn-primario">{pending ? 'Guardando…' : cambiaNombre ? 'Guardar y pedir aprobación' : 'Guardar'}</button>
+          <div className="pie-acciones">
+            <button type="submit" disabled={pending} className="btn-primario">{pending ? 'Guardando…' : cambiaNombre ? 'Guardar y pedir aprobación' : 'Guardar cambios'}</button>
+            <button type="button" onClick={() => ref.current?.close()} className="btn-ghost">Cerrar sin guardar</button>
           </div>
         </form>
       </dialog>
