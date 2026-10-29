@@ -4,9 +4,10 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { after } from 'next/server';
 import { getContexto } from '@/lib/datos';
-import { canalesActivos, notificar } from '@/lib/notificar';
+import { canalesActivos, notificar, SITIO } from '@/lib/notificar';
 import { armarAvisoAsignada, armarAvisoTarea, CAMPOS_PERFIL, type PerfilAvisos } from '@/lib/recordatorios';
 import { createAdminClient } from '@/lib/supabase/admin';
+import { sanitizarHtml, textoPlano } from '@/lib/html';
 import type { Estado, EstadoFase, Paso, Prioridad } from '@/lib/types';
 
 function limpiar(texto: FormDataEntryValue | null, max = 500) {
@@ -40,6 +41,63 @@ export async function crearProyecto(formData: FormData) {
   }
   revalidatePath('/', 'layout');
   redirect(`/proyectos/${data.id}`);
+}
+
+/** Descripción y color se cambian directo. El nombre necesita aprobación (ver solicitarCambioNombre). */
+export async function actualizarProyecto(proyectoId: string, cambios: { descripcion?: string | null; color?: string }) {
+  const { supabase } = await getContexto();
+  const permitido: Record<string, unknown> = {};
+  if ('descripcion' in cambios) permitido.descripcion = String(cambios.descripcion || '').trim().slice(0, 1000) || null;
+  if (cambios.color && /^#[0-9a-f]{6}$/i.test(cambios.color)) permitido.color = cambios.color;
+  if (!Object.keys(permitido).length) return;
+  const { error } = await supabase.from('proyectos').update(permitido).eq('id', proyectoId);
+  if (error) throw new Error(error.message);
+  revalidatePath('/', 'layout');
+}
+
+/** Propone un nombre nuevo; se aplica cuando todo el equipo lo aprueba. Avisa a los demás por sus canales. */
+export async function solicitarCambioNombre(proyectoId: string, nombre: string): Promise<{ ok: boolean; texto: string }> {
+  const { supabase, yo, equipo } = await getContexto();
+  const { data: id, error } = await supabase.rpc('solicitar_cambio_nombre', { p_proyecto: proyectoId, p_nombre: nombre });
+  if (error) return { ok: false, texto: error.message };
+  revalidatePath('/', 'layout');
+  if (!id) return { ok: true, texto: 'El nombre es el mismo; no hubo cambios.' };
+  const { data: sol } = await supabase.from('solicitudes_nombre').select('estado, nombre_actual, nombre_nuevo').eq('id', id).single();
+  if (sol?.estado === 'aprobada') return { ok: true, texto: 'Nombre cambiado.' };
+
+  const otros = equipo.filter((m) => m.id !== yo.id).map((m) => m.id);
+  const deParte = (yo.nombre || yo.email).split(' ')[0];
+  after(async () => {
+    if (!sol || !otros.length) return;
+    const { data: personas } = await createAdminClient().from('perfiles').select(CAMPOS_PERFIL).in('id', otros);
+    const enlace = SITIO() ? `${SITIO()}/proyectos/${proyectoId}` : undefined;
+    for (const p of (personas || []) as PerfilAvisos[]) {
+      const canales = canalesActivos(p);
+      if (!canales.length) continue;
+      await notificar(
+        p,
+        {
+          asunto: `${deParte} propone renombrar «${sol.nombre_actual}»`,
+          intro: `${deParte} propone cambiar el nombre de un proyecto. Se aplica cuando todo el equipo lo aprueba:`,
+          mensaje: `«${sol.nombre_actual}» → «${sol.nombre_nuevo}»`,
+          lineas: [{ etiqueta: 'Pendiente de tu aprobación', color: '#B54708', titulo: sol.nombre_nuevo, detalle: `Antes: ${sol.nombre_actual}`, enlace }],
+          enlace,
+          resumenWhatsApp: `${deParte} propone renombrar el proyecto «${sol.nombre_actual}» a «${sol.nombre_nuevo}». Entra para aprobar o rechazar`
+        },
+        canales,
+        { tipo: 'solicitud', tareas: [] }
+      );
+    }
+  });
+  return { ok: true, texto: 'Solicitud enviada. El nombre cambia cuando todo el equipo lo apruebe.' };
+}
+
+export async function votarCambioNombre(solicitudId: string, aprueba: boolean): Promise<string> {
+  const { supabase } = await getContexto();
+  const { data, error } = await supabase.rpc('votar_cambio_nombre', { p_id: solicitudId, p_aprueba: aprueba });
+  if (error) throw new Error(error.message);
+  revalidatePath('/', 'layout');
+  return data as string;
 }
 
 export async function archivarProyecto(proyectoId: string) {
@@ -168,7 +226,7 @@ export async function crearTarea(t: NuevaTarea) {
       fecha_inicio: t.fecha_inicio || null,
       fecha_limite: t.fecha_limite || null,
       fase_id: t.fase_id || null,
-      descripcion: t.descripcion || null,
+      descripcion: t.descripcion ? sanitizarHtml(t.descripcion) || null : null,
       // Las nuevas quedan de primeras en su columna.
       posicion: t.posicion ?? -Date.now(),
       creado_por: user.id
@@ -191,6 +249,7 @@ export async function actualizarTarea(id: string, cambios: CambiosTarea) {
     if (k in cambios) (permitido as Record<string, unknown>)[k] = cambios[k] === '' ? null : cambios[k];
   });
   if (typeof permitido.titulo === 'string') permitido.titulo = permitido.titulo.trim().slice(0, 200);
+  if (typeof permitido.descripcion === 'string') permitido.descripcion = textoPlano(permitido.descripcion) ? sanitizarHtml(permitido.descripcion) : null;
   if (typeof permitido.mensaje_recordatorio === 'string') permitido.mensaje_recordatorio = permitido.mensaje_recordatorio.trim().slice(0, 300) || null;
   if (permitido.recordar_en) {
     const d = new Date(permitido.recordar_en);

@@ -57,6 +57,8 @@ export default function ProyectoVista({ proyecto, tareasIniciales, fases, equipo
       .on('postgres_changes', { event: '*', schema: 'public', table: 'fases', filter: `proyecto_id=eq.${proyecto.id}` }, refrescarPagina)
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'fases' }, refrescarPagina)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'adjuntos' }, contarAdjuntos)
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'proyectos', filter: `id=eq.${proyecto.id}` }, refrescarPagina)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes_nombre', filter: `proyecto_id=eq.${proyecto.id}` }, refrescarPagina)
       .subscribe((estado) => setEnVivo(estado === 'SUBSCRIBED'));
     return () => {
       clearTimeout(refresco);

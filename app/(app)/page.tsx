@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import Avatar from '@/components/Avatar';
 import NuevoProyecto from '@/components/NuevoProyecto';
+import SolicitudNombre, { type Solicitud } from '@/components/SolicitudNombre';
 import { getContexto } from '@/lib/datos';
 import { nombreCorto } from '@/lib/perfil';
 import { estadoFecha, formatoCorto, hoyBogota } from '@/lib/fechas';
@@ -20,6 +21,11 @@ export default async function Inicio() {
     .from('tareas')
     .select('id, proyecto_id, titulo, estado, prioridad, responsables, fecha_limite, terminado_en')
     .eq('workspace_id', workspaceId);
+  const { data: solicitudes } = await supabase
+    .from('solicitudes_nombre')
+    .select('id, proyecto_id, nombre_actual, nombre_nuevo, solicitado_por, aprobaciones')
+    .eq('workspace_id', workspaceId)
+    .eq('estado', 'pendiente');
   const tareas = (data || []) as Pick<Tarea, 'id' | 'proyecto_id' | 'titulo' | 'estado' | 'prioridad' | 'responsables' | 'fecha_limite' | 'terminado_en'>[];
 
   const hoy = hoyBogota();
@@ -59,6 +65,14 @@ export default async function Inicio() {
         </div>
         <NuevoProyecto />
       </header>
+
+      {(solicitudes || []).length > 0 && (
+        <section aria-label="Solicitudes pendientes" className="mb-6 flex flex-col gap-3">
+          {(solicitudes as Solicitud[]).map((sol) => (
+            <SolicitudNombre key={sol.id} s={sol} equipo={equipo} yoId={yo.id} compacto />
+          ))}
+        </section>
+      )}
 
       <section aria-label="Resumen" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         {kpis.map((k) => (

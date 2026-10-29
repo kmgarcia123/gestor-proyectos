@@ -37,6 +37,15 @@ Pensada para uso interno, pero **multi-espacio desde el día 1**: todo pertenece
 - **Tiempo real** (Supabase Realtime): tareas, fases y adjuntos se actualizan solos para todo el equipo; indicador «En vivo».
 - Base de datos: `supabase/migrations/0005_adjuntos_y_tiempo_real.sql`.
 
+## Fase 5 (incluido)
+
+- Ficha de nueva tarea con **fase** (por defecto «Sin fase»).
+- **Última modificación** de cada tarea con fecha, hora y quién la hizo (solo cambios de personas, no de procesos automáticos).
+- **Íconos y colores** para estado y prioridad (selectores visuales en la tarea, chip en la tarjeta, ícono en cada columna).
+- **Descripción con formato**: negrita, cursiva, subrayado, tachado, color, resaltado, tamaño, tipo de letra y listas. Se guarda como HTML limpio (lista blanca en servidor y navegador).
+- **Editar proyecto**: descripción y color al instante; el **nombre** cambia solo cuando lo aprueba todo el equipo (aviso por correo/WhatsApp, aprobar/rechazar en el proyecto y en Inicio).
+- Base de datos: `supabase/migrations/0006_modificado_por_y_aprobaciones.sql`.
+
 ## Próximas fases
 
 3. Calendario, Gantt y panel · 4. Mapa del proyecto que se colorea por fases · 5. Acceso de clientes.

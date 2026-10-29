@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, useTransition } from 'react';
 import { actualizarTarea, eliminarTarea, guardarPasos, recordarAhora, type CambiosTarea } from '@/app/(app)/actions';
 import ListaPasos from '@/components/ListaPasos';
 import Adjuntos from '@/components/Adjuntos';
+import EditorTexto from '@/components/EditorTexto';
+import { ESTILO_ESTADO, ESTILO_PRIORIDAD, IconoEstado, IconoPrioridad } from '@/components/Iconos';
 import SelectorResponsables from '@/components/SelectorResponsables';
 import { aplanar } from '@/lib/fases';
 import { ESTADOS, PRIORIDADES, type Fase, type Paso, type Perfil, type Tarea } from '@/lib/types';
@@ -126,19 +128,45 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
           <button type="button" onClick={() => ref.current?.close()} className="btn-suave h-9 min-h-0 w-9 shrink-0 px-0" aria-label="Cerrar">✕</button>
         </div>
 
+        <div>
+          <p className="etiqueta">Estado</p>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4" role="radiogroup" aria-label="Estado">
+            {ESTADOS.map((e) => (
+              <button
+                key={e.id}
+                type="button"
+                role="radio"
+                aria-checked={form.estado === e.id}
+                onClick={() => set('estado', e.id)}
+                className={`flex items-center justify-center gap-1.5 rounded-xl border-2 px-2 py-2 text-xs font-bold transition ${form.estado === e.id ? ESTILO_ESTADO[e.id].activo : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+              >
+                <span className={form.estado === e.id ? '' : ESTILO_ESTADO[e.id].punto}><IconoEstado e={e.id} size={16} /></span>
+                {e.nombre}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <p className="etiqueta">Prioridad</p>
+          <div className="grid grid-cols-4 gap-2" role="radiogroup" aria-label="Prioridad">
+            {PRIORIDADES.map((pr) => (
+              <button
+                key={pr.id}
+                type="button"
+                role="radio"
+                aria-checked={form.prioridad === pr.id}
+                onClick={() => set('prioridad', pr.id)}
+                className={`flex items-center justify-center gap-1 rounded-xl border-2 px-1.5 py-2 text-xs font-bold transition ${form.prioridad === pr.id ? ESTILO_PRIORIDAD[pr.id].activo : 'border-slate-200 text-slate-500 hover:border-slate-300'}`}
+              >
+                <IconoPrioridad p={pr.id} size={15} />
+                {pr.nombre}
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3">
-          <div>
-            <label className="etiqueta" htmlFor="dt-estado">Estado</label>
-            <select id="dt-estado" value={form.estado} onChange={(e) => set('estado', e.target.value as Tarea['estado'])} className="campo">
-              {ESTADOS.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="etiqueta" htmlFor="dt-prio">Prioridad</label>
-            <select id="dt-prio" value={form.prioridad} onChange={(e) => set('prioridad', e.target.value as Tarea['prioridad'])} className="campo">
-              {PRIORIDADES.map((p) => <option key={p.id} value={p.id}>{p.nombre}</option>)}
-            </select>
-          </div>
           <div>
             <label className="etiqueta" htmlFor="dt-fase">Fase</label>
             <select id="dt-fase" value={form.fase_id || ''} onChange={(e) => set('fase_id', e.target.value || null)} className="campo">
@@ -161,13 +189,13 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
           <SelectorResponsables equipo={equipo} valor={form.responsables || []} onCambio={(ids) => set('responsables', ids)} />
         </div>
 
-        <ListaPasos key={tarea?.id} pasos={form.pasos || []} onCambio={cambiarPasos} />
+        <ListaPasos key={`pasos-${tarea?.id}`} pasos={form.pasos || []} onCambio={cambiarPasos} />
 
-        {tarea && <Adjuntos key={tarea.id} tareaId={tarea.id} workspaceId={tarea.workspace_id} onTotal={(n) => onParcial(tarea.id, { adjuntos_total: n })} />}
+        {tarea && <Adjuntos key={`adjuntos-${tarea.id}`} tareaId={tarea.id} workspaceId={tarea.workspace_id} onTotal={(n) => onParcial(tarea.id, { adjuntos_total: n })} />}
 
         <div>
           <label className="etiqueta" htmlFor="dt-desc">Descripción</label>
-          <textarea id="dt-desc" rows={5} value={form.descripcion || ''} onChange={(e) => set('descripcion', e.target.value)} className="campo" placeholder="Detalles, enlaces, criterios de terminado…" />
+          <EditorTexto key={`editor-${tarea?.id}`} id="dt-desc" valor={form.descripcion || ''} onCambio={(html) => set('descripcion', html)} placeholder="Detalles, enlaces, criterios de terminado…" />
         </div>
 
         <fieldset className="rounded-2xl border border-nube bg-fondo p-4">
@@ -207,7 +235,10 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
             {form.creado_por && equipo.find((m) => m.id === form.creado_por) ? ` por ${(equipo.find((m) => m.id === form.creado_por)!.nombre || equipo.find((m) => m.id === form.creado_por)!.email).split(' ')[0]}` : ''}
           </p>
           {form.actualizado_en && Math.abs(new Date(form.actualizado_en).getTime() - new Date(form.creado_en).getTime()) > 60_000 && (
-            <p>Última modificación: {new Date(form.actualizado_en).toLocaleString('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
+            <p>
+              Última modificación: {new Date(form.actualizado_en).toLocaleString('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+              {form.actualizado_por && equipo.find((m) => m.id === form.actualizado_por) ? ` por ${(equipo.find((m) => m.id === form.actualizado_por)!.nombre || equipo.find((m) => m.id === form.actualizado_por)!.email).split(' ')[0]}` : ''}
+            </p>
           )}
         </div>
 
