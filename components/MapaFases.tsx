@@ -267,7 +267,7 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
         <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded border-2 border-turquesa bg-turquesa-suave" />Ejecutada · {conteo.hecho}</span>
         <span className="text-slate-500 sm:ml-auto">Arrastra los cuadros para acomodarlos · Clic para ver sus tareas</span>
         {libres && (
-          <button type="button" disabled={pending} onClick={() => (setFijas(new Map()), setRaizFija(null), start(() => ordenarMapa(proyecto.id)))} className="btn-suave min-h-0 py-1.5 text-xs">
+          <button type="button" disabled={pending} onClick={() => (setFijas(new Map()), setRaizFija(null), start(() => ordenarMapa(proyecto.id)))} className="btn-ghost min-h-0 py-1.5 text-xs">
             Ordenar automáticamente
           </button>
         )}
@@ -416,20 +416,29 @@ function EditorFase({ editor, fases, proyectoId, onCerrar }: { editor: Editor; f
             </div>
           )}
           {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>}
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            {editor.modo === 'editar' ? (
-              <button type="button" onClick={borrar} disabled={pending} className="btn-peligro">
-                {confirmar ? (sub ? `Sí, eliminar con ${sub} subfase${sub > 1 ? 's' : ''}` : 'Sí, eliminar') : 'Eliminar'}
-              </button>
-            ) : (
-              <span />
-            )}
-            <div className="flex gap-2">
-              <button type="button" onClick={() => ref.current?.close()} className="btn-suave">Cancelar</button>
-              <button type="submit" disabled={pending} className="btn-primario">{pending ? 'Guardando…' : 'Guardar'}</button>
+          {confirmar && editor.modo === 'editar' ? (
+            <div className="flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4" role="alertdialog" aria-label="Confirmar eliminación">
+              <p className="text-sm text-red-800">
+                Se elimina «{editor.fase.nombre}»{sub ? ` y ${sub} subfase${sub > 1 ? 's' : ''}` : ''}. Sus tareas no se borran: quedan «sin fase».
+              </p>
+              <div className="flex flex-wrap items-center gap-2">
+                <button type="button" onClick={borrar} disabled={pending} className="btn-destructivo bg-white">
+                  {pending ? 'Eliminando…' : sub ? `Eliminar fase y ${sub} subfase${sub > 1 ? 's' : ''}` : 'Eliminar fase definitivamente'}
+                </button>
+                <button type="button" onClick={() => setConfirmar(false)} className="btn-ghost">Conservar fase</button>
+              </div>
             </div>
-          </div>
-          {confirmar && <p className="text-xs text-slate-500">Las tareas de esta fase no se borran: quedan «sin fase».</p>}
+          ) : (
+            <div className="pie-acciones">
+              <button type="submit" disabled={pending} className="btn-primario">{pending ? 'Guardando…' : editor.modo === 'editar' ? 'Guardar cambios' : 'Crear fase'}</button>
+              <button type="button" onClick={() => ref.current?.close()} className="btn-ghost">{editor.modo === 'editar' ? 'Cerrar sin guardar' : 'Cerrar sin crear'}</button>
+              {editor.modo === 'editar' && (
+                <div className="separador-destructivo">
+                  <button type="button" onClick={borrar} disabled={pending} className="btn-destructivo">Eliminar fase</button>
+                </div>
+              )}
+            </div>
+          )}
         </form>
       )}
     </dialog>

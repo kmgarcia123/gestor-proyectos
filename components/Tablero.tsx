@@ -70,7 +70,7 @@ function AgregarRapido({ onAgregar, id }: { onAgregar: (titulo: string) => void;
       <div className="flex items-center gap-1 rounded-xl border border-dashed border-slate-300 bg-white/60 pr-1 transition focus-within:border-azul focus-within:bg-white hover:bg-white">
         <button type="submit" className="pl-3 text-lg font-bold leading-none text-azul" aria-label="Crear tarea">+</button>
         <input id={id} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Agregar tarea" className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-0" />
-        {valor.trim() && <button type="submit" className="rounded-lg bg-azul px-2.5 py-1 text-xs font-bold text-white">Crear</button>}
+        {valor.trim() && <button type="submit" className="rounded-lg px-2.5 py-1 text-xs font-bold text-azul hover:bg-nube">Continuar</button>}
       </div>
     </form>
   );

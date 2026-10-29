@@ -191,7 +191,7 @@ export default function Adjuntos({ tareaId, workspaceId, onTotal }: Props) {
                 className={`absolute right-1 top-1 rounded-full px-2 py-0.5 text-[11px] font-bold shadow ${borrar === a.id ? 'bg-red-600 text-white' : 'bg-white/90 text-slate-600 opacity-80 group-hover:opacity-100'}`}
                 aria-label={`Borrar ${a.nombre}`}
               >
-                {borrar === a.id ? '¿Borrar?' : '✕'}
+                {borrar === a.id ? 'Borrar archivo' : '✕'}
               </button>
             </li>
           ))}
@@ -210,7 +210,7 @@ export default function Adjuntos({ tareaId, workspaceId, onTotal }: Props) {
                 <span className="block text-xs text-slate-500">{tamanoLegible(a.tamano)}</span>
               </a>
               <button type="button" onClick={() => eliminar(a)} className={`rounded-lg px-2 py-1 text-xs font-bold ${borrar === a.id ? 'bg-red-600 text-white' : 'text-slate-400 hover:bg-red-50 hover:text-red-600'}`} aria-label={`Borrar ${a.nombre}`}>
-                {borrar === a.id ? '¿Borrar?' : '✕'}
+                {borrar === a.id ? 'Borrar archivo' : '✕'}
               </button>
             </li>
           ))}

@@ -81,7 +81,7 @@ export default function NuevaTareaRapida({ abierta, equipo, yoId, fases, faseIni
             <h2 id="ntr-titulo" className="text-lg font-extrabold">Nueva tarea</h2>
             <p className="text-xs text-slate-500">En «{columna}»</p>
           </div>
-          <button type="button" onClick={() => ref.current?.close()} className="btn-suave h-9 min-h-0 w-9 shrink-0 px-0" aria-label="Cerrar">✕</button>
+          <button type="button" onClick={() => ref.current?.close()} className="btn-icono" aria-label="Cerrar">✕</button>
         </div>
 
         <div>
@@ -112,11 +112,12 @@ export default function NuevaTareaRapida({ abierta, equipo, yoId, fases, faseIni
 
         {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>}
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <button type="button" onClick={() => crear(true)} disabled={pending} className="btn-suave">Crear y ver detalle</button>
+        <div className="pie-acciones">
           <button type="submit" disabled={pending} className="btn-primario">{pending ? 'Creando…' : 'Crear tarea'}</button>
+          <button type="button" onClick={() => crear(true)} disabled={pending} className="btn-suave">Crear y ver detalle</button>
+          <button type="button" onClick={() => ref.current?.close()} className="btn-ghost">Cerrar sin crear</button>
         </div>
-        {responsables.some((r) => r !== yoId) && <p className="-mt-2 text-right text-xs text-slate-500">A los responsables les llega un aviso al crearla.</p>}
+        {responsables.some((r) => r !== yoId) && <p className="-mt-2 text-xs text-slate-500">A los responsables les llega un aviso al crearla.</p>}
       </form>
     </dialog>
   );

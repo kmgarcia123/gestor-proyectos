@@ -58,11 +58,11 @@ export default function SolicitudNombre({ s, equipo, yoId, compacto = false }: {
       <div className="flex shrink-0 gap-2">
         {!yaAprobe && (
           <button type="button" disabled={pending} onClick={() => votar(true)} className="btn-primario min-h-0 py-2">
-            Aprobar
+            Aprobar nombre
           </button>
         )}
         <button type="button" disabled={pending} onClick={() => votar(false)} className="btn-suave min-h-0 bg-white py-2">
-          {soyQuienPide ? 'Cancelar solicitud' : 'Rechazar'}
+          {soyQuienPide ? 'Retirar mi solicitud' : 'Rechazar nombre'}
         </button>
       </div>
     </div>
