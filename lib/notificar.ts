@@ -9,7 +9,7 @@ import { createAdminClient } from '@/lib/supabase/admin';
  */
 
 export type Canal = 'correo' | 'whatsapp';
-export type TipoAviso = 'manana' | 'dias_antes' | 'hoy' | 'vencida' | 'resumen' | 'personal' | 'manual' | 'prueba' | 'asignada';
+export type TipoAviso = 'manana' | 'dias_antes' | 'hoy' | 'vencida' | 'resumen' | 'personal' | 'manual' | 'prueba' | 'asignada' | 'solicitud';
 
 export interface Destinatario {
   id: string;

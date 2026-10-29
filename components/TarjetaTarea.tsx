@@ -3,13 +3,10 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import GrupoAvatares from '@/components/GrupoAvatares';
+import { ESTILO_PRIORIDAD, IconoPrioridad } from '@/components/Iconos';
 import { estadoFecha, formatoCorto, hoyBogota } from '@/lib/fechas';
 import type { Fase, Perfil, Tarea } from '@/lib/types';
 
-const PRIO: Record<string, { txt: string; cls: string } | undefined> = {
-  alta: { txt: 'Alta', cls: 'bg-orange-50 text-orange-800' },
-  urgente: { txt: 'Urgente', cls: 'bg-red-50 text-red-700' }
-};
 const FECHA: Record<string, string> = {
   vencida: 'bg-red-50 text-red-700',
   hoy: 'bg-amber-50 text-amber-800',
@@ -30,7 +27,10 @@ export function ContenidoTarjeta({ t, responsables, fase }: { t: Tarea; responsa
             ▶ Inicia {formatoCorto(t.fecha_inicio!)}
           </span>
         )}
-        {PRIO[t.prioridad] && <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${PRIO[t.prioridad]!.cls}`}>{PRIO[t.prioridad]!.txt}</span>}
+        <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-semibold ${ESTILO_PRIORIDAD[t.prioridad].chip}`} title={`Prioridad ${ESTILO_PRIORIDAD[t.prioridad].texto.toLowerCase()}`}>
+          <IconoPrioridad p={t.prioridad} size={12} />
+          {t.prioridad === 'media' ? '' : ESTILO_PRIORIDAD[t.prioridad].texto}
+        </span>
         {t.fecha_limite && (
           <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${t.estado === 'hecho' ? 'bg-turquesa-suave text-turquesa-oscuro' : FECHA[ef] || ''}`}>
             <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 10h18" /></svg>

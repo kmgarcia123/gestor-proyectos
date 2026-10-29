@@ -19,14 +19,8 @@ import DialogoTarea from '@/components/DialogoTarea';
 import NuevaTareaRapida, { type DatosNuevaTarea } from '@/components/NuevaTareaRapida';
 import { actualizarTarea, crearTarea } from '@/app/(app)/actions';
 import { ESTADOS, type Estado, type Fase, type Perfil, type Tarea } from '@/lib/types';
+import { ESTILO_ESTADO, IconoEstado } from '@/components/Iconos';
 import { aplanar, conDescendientes } from '@/lib/fases';
-
-const COLOR_COL: Record<Estado, string> = {
-  por_hacer: 'bg-slate-400',
-  en_curso: 'bg-azul',
-  revision: 'bg-amber-500',
-  hecho: 'bg-turquesa'
-};
 
 interface Props {
   proyectoId: string;
@@ -45,7 +39,7 @@ function Columna({ estado, nombre, children, total, arriba }: { estado: Estado; 
   return (
     <section aria-label={nombre} className={`flex w-[82vw] max-w-[320px] shrink-0 snap-center flex-col rounded-3xl p-3 transition-colors sm:w-auto sm:max-w-none sm:min-w-0 ${isOver ? 'bg-azul-suave' : 'bg-nube'}`}>
       <h2 className="mb-3 flex items-center gap-2 px-1 text-sm font-bold">
-        <span className={`h-2.5 w-2.5 rounded-full ${COLOR_COL[estado]}`} aria-hidden="true" />
+        <span className={ESTILO_ESTADO[estado].punto}><IconoEstado e={estado} size={16} /></span>
         {nombre}
         <span className="ml-auto rounded-full bg-white px-2 py-0.5 text-xs font-semibold text-slate-500">{total}</span>
       </h2>
@@ -131,7 +125,7 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
   async function agregar(estado: Estado, datos: DatosNuevaTarea, abrir: boolean) {
     // Queda de primera en la columna.
     const min = Math.min(0, ...tareas.filter((t) => t.estado === estado).map((t) => t.posicion));
-    const creada = (await crearTarea({ proyecto_id: proyectoId, titulo: datos.titulo, responsables: datos.responsables, fecha_limite: datos.fecha_limite, estado, posicion: min - 1024, fase_id: faseFiltro || null })) as Tarea | null;
+    const creada = (await crearTarea({ proyecto_id: proyectoId, titulo: datos.titulo, responsables: datos.responsables, fecha_limite: datos.fecha_limite, estado, posicion: min - 1024, fase_id: datos.fase_id })) as Tarea | null;
     if (!creada) return;
     setTareas((ts) => (ts.some((t) => t.id === creada.id) ? ts : [{ ...creada, adjuntos_total: 0 }, ...ts]));
     if (abrir) setTimeout(() => setAbierta({ ...creada, adjuntos_total: 0 }), 50);
@@ -186,7 +180,8 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
         abierta={nueva}
         equipo={equipo}
         yoId={yoId}
-        faseNombre={faseFiltro ? fasePorId[faseFiltro]?.nombre : undefined}
+        fases={fases}
+        faseInicial={faseFiltro || undefined}
         onCerrar={() => setNueva(null)}
         onCrear={(datos, abrir) => agregar(nueva!.estado, datos, abrir)}
       />
@@ -196,7 +191,7 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
         equipo={equipo}
         fases={fases}
         onCerrar={() => setAbierta(null)}
-        onGuardada={(t) => setTareas((ts) => ts.map((x) => (x.id === t.id ? { ...x, ...t, pasos: x.pasos, adjuntos_total: x.adjuntos_total } : x)))}
+        onGuardada={(t) => setTareas((ts) => ts.map((x) => (x.id === t.id ? { ...x, ...t, pasos: x.pasos, adjuntos_total: x.adjuntos_total, actualizado_en: new Date().toISOString(), actualizado_por: yoId } : x)))}
         onParcial={(id, c) => setTareas((ts) => ts.map((x) => (x.id === id ? { ...x, ...c } : x)))}
         onEliminada={(id) => setTareas((ts) => ts.filter((x) => x.id !== id))}
       />

@@ -14,7 +14,8 @@ const TIPOS: Record<string, string> = {
   personal: 'Recordatorio programado',
   manual: 'Recordar ahora',
   prueba: 'Prueba',
-  asignada: 'Tarea asignada'
+  asignada: 'Tarea asignada',
+  solicitud: 'Cambio de nombre'
 };
 
 export default async function Notificaciones() {

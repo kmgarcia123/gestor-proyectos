@@ -1,6 +1,8 @@
 import { notFound } from 'next/navigation';
 import Avatar from '@/components/Avatar';
 import ProyectoVista from '@/components/ProyectoVista';
+import EditarProyecto from '@/components/EditarProyecto';
+import SolicitudNombre, { type Solicitud } from '@/components/SolicitudNombre';
 import { getContexto } from '@/lib/datos';
 import { formatoCorto } from '@/lib/fechas';
 import type { Fase, Tarea } from '@/lib/types';
@@ -14,9 +16,10 @@ export default async function ProyectoPage({ params, searchParams }: { params: P
   const proyecto = proyectos.find((p) => p.id === id);
   if (!proyecto) notFound();
 
-  const [{ data: fases }, { data: tareas }] = await Promise.all([
+  const [{ data: fases }, { data: tareas }, { data: solicitud }] = await Promise.all([
     supabase.from('fases').select('*').eq('proyecto_id', id).order('posicion'),
-    supabase.from('tareas').select('*, adjuntos(count)').eq('proyecto_id', id).order('posicion')
+    supabase.from('tareas').select('*, adjuntos(count)').eq('proyecto_id', id).order('posicion'),
+    supabase.from('solicitudes_nombre').select('id, proyecto_id, nombre_actual, nombre_nuevo, solicitado_por, aprobaciones').eq('proyecto_id', id).eq('estado', 'pendiente').maybeSingle()
   ]);
   // adjuntos(count) llega como [{ count: n }]; se deja como número.
   const ts = ((tareas || []) as (Tarea & { adjuntos?: { count: number }[] })[]).map(({ adjuntos, ...t }) => ({ ...t, adjuntos_total: adjuntos?.[0]?.count ?? 0 })) as Tarea[];
@@ -31,6 +34,7 @@ export default async function ProyectoPage({ params, searchParams }: { params: P
             <div className="flex items-center gap-2">
               <span className="h-3 w-3 rounded-full" style={{ background: proyecto.color }} aria-hidden="true" />
               <h1 className="truncate text-2xl font-extrabold tracking-tight">{proyecto.nombre}</h1>
+              <EditarProyecto proyecto={proyecto} totalEquipo={equipo.length} hayPendiente={!!solicitud} />
             </div>
             {proyecto.descripcion && <p className="mt-1 max-w-2xl text-sm text-slate-500">{proyecto.descripcion}</p>}
           </div>
@@ -52,6 +56,7 @@ export default async function ProyectoPage({ params, searchParams }: { params: P
             </div>
           </div>
         </div>
+        {solicitud && <SolicitudNombre s={solicitud as Solicitud} equipo={equipo} yoId={yo.id} />}
       </header>
       <ProyectoVista
         key={id}

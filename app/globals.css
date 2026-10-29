@@ -16,3 +16,12 @@ body { @apply bg-fondo text-carbon antialiased; }
   .tarjeta { @apply rounded-2xl bg-white shadow-suave; }
 }
 
+
+/* Descripción con formato */
+.descripcion ul { list-style: disc; padding-left: 1.4rem; }
+.descripcion ol { list-style: decimal; padding-left: 1.4rem; }
+.descripcion a { color: #2246C4; text-decoration: underline; }
+.descripcion font[size="2"] { font-size: 0.8rem; }
+.descripcion font[size="5"] { font-size: 1.25rem; }
+.descripcion font[size="6"] { font-size: 1.6rem; font-weight: 700; }
+.descripcion blockquote { border-left: 3px solid #CBD5E1; padding-left: 0.75rem; color: #475467; }

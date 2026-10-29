@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/lib/supabase/admin';
+import { textoPlano } from '@/lib/html';
 import { formatoCorto, hoyBogota } from '@/lib/fechas';
 import { canalesActivos, notificar, primerNombre, registrar, SITIO, type Aviso, type Canal, type Destinatario, type LineaAviso, type Resultado, type TipoAviso } from '@/lib/notificar';
 
@@ -135,7 +136,7 @@ export function armarAvisoAsignada(
   deParte: string
 ): Aviso {
   const fechas = [t.fecha_inicio && `inicia ${formatoCorto(t.fecha_inicio)}`, t.fecha_limite && `vence ${formatoCorto(t.fecha_limite)}`].filter(Boolean).join(', ');
-  const desc = (t.descripcion || '').trim();
+  const desc = textoPlano(t.descripcion);
   return {
     asunto: `${deParte} te asignó: ${t.titulo}`,
     intro: `${deParte} te asignó una tarea${t.proyecto ? ` en ${t.proyecto}` : ''}:`,

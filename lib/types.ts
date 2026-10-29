@@ -61,6 +61,8 @@ export interface Tarea {
   posicion: number;
   creado_en: string;
   creado_por?: string | null;
+  actualizado_en?: string;
+  actualizado_por?: string | null;
   terminado_en: string | null;
   recordar_en?: string | null;
   recordatorio_enviado_en?: string | null;
