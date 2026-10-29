@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/lib/supabase/admin';
 import { textoPlano } from '@/lib/html';
 import { formatoCorto, hoyBogota } from '@/lib/fechas';
+import { FRASES_WHATSAPP } from '@/lib/frases-whatsapp';
 import { canalesActivos, notificar, primerNombre, registrar, SITIO, type Aviso, type Canal, type Destinatario, type LineaAviso, type Resultado, type TipoAviso } from '@/lib/notificar';
 
 /**
@@ -36,6 +37,21 @@ interface TareaAviso {
   proyectos: { nombre: string } | null;
 }
 
+const EMOJI: Record<string, string> = { vencida: '🔥 Vencida', hoy: '⏰ Hoy', manana: '📅 Mañana', dias_antes: '📅 Pronto' };
+
+/** Nombres en lista: "Fabián y Juan". */
+const enLista = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : xs[0] || '');
+
+/** Un remate al azar de lib/frases-whatsapp.ts ({otros} = los demás del equipo). */
+export function remate(otros: string[] = []): string {
+  const opciones = FRASES_WHATSAPP.filter((f) => otros.length || !f.includes('{otros}'));
+  if (!opciones.length) return '';
+  const f = opciones[Math.floor(Math.random() * opciones.length)];
+  return f.replace('{otros}', enLista(otros)).trim();
+}
+
+const conProyecto = (titulo: string, proyecto?: string | null) => `«${titulo}»${proyecto ? ` (${proyecto})` : ''}`;
+
 const COLOR: Record<string, string> = { vencida: '#B42318', hoy: '#92400E', dias_antes: '#1B389E', manana: '#1B389E', resumen: '#6E6E73' };
 
 export function horaBogota(fecha = new Date()): number {
@@ -68,7 +84,7 @@ export function tipoDiario(fecha: string | null, p: PerfilAvisos, hoy: string): 
 }
 
 /** Arma el mensaje diario de una persona. */
-export function armarAvisoDiario(p: PerfilAvisos, alertas: { tarea: TareaAviso; tipo: TipoDiario }[], otras: TareaAviso[]): Aviso {
+export function armarAvisoDiario(p: PerfilAvisos, alertas: { tarea: TareaAviso; tipo: TipoDiario }[], otras: TareaAviso[], otrosNombres: string[] = []): Aviso {
   const orden: TipoDiario[] = ['vencida', 'hoy', 'manana', 'dias_antes'];
   alertas.sort((a, b) => orden.indexOf(a.tipo) - orden.indexOf(b.tipo));
   const lineas: LineaAviso[] = alertas.map(({ tarea, tipo }) => ({
@@ -92,7 +108,6 @@ export function armarAvisoDiario(p: PerfilAvisos, alertas: { tarea: TareaAviso; 
     pronto && `${pronto} por vencer`,
     otras.length && pl(otras.length, 'pendiente', 'pendientes')
   ].filter(Boolean) as string[];
-  const enLista = (xs: string[]) => (xs.length > 1 ? `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}` : xs[0] || '');
 
   const chips = [
     vencidas && { texto: pl(vencidas, 'vencida', 'vencidas'), color: '#B42318', fondo: '#FEF3F2' },
@@ -105,14 +120,20 @@ export function armarAvisoDiario(p: PerfilAvisos, alertas: { tarea: TareaAviso; 
     lineas.forEach((l, i) => (l.grupo = i < alertas.length ? 'Necesitan atención' : 'Otras pendientes'));
   }
 
-  const titulos = alertas.map((a) => `«${a.tarea.titulo}»`).slice(0, 4).join(', ');
+  // WhatsApp: hasta 3 tareas con su proyecto, el resto como "y N pendientes más", y un remate.
+  const destacadas = alertas.slice(0, 3).map((a) => `${EMOJI[a.tipo]}: ${conProyecto(a.tarea.titulo, a.tarea.proyectos?.nombre)}`);
+  if (!destacadas.length) destacadas.push(...otras.slice(0, 3).map((t) => `📌 ${conProyecto(t.titulo, t.proyectos?.nombre)}`));
+  const restantes = alertas.length + otras.length - destacadas.length;
+  const cola = restantes > 0 ? `${destacadas.length ? 'y ' : ''}${restantes} pendiente${restantes === 1 ? '' : 's'} más` : '';
+  const chiste = remate(otrosNombres);
   return {
     asunto: `${primerNombre(p)}, tienes ${enLista(partes) || 'tareas pendientes'}`,
     intro: alertas.length ? 'Estas son tus tareas que necesitan atención:' : 'Este es tu resumen de tareas pendientes:',
     chips,
     lineas,
     enlace: SITIO() || undefined,
-    resumenWhatsApp: `${enLista(partes)}${titulos ? ` (${titulos}${alertas.length > 4 ? '…' : ''})` : ''}`
+    remate: chiste || undefined,
+    resumenWhatsApp: [[...destacadas, cola].filter(Boolean).join(' · ') || 'tareas pendientes', chiste].filter(Boolean).join('. ')
   };
 }
 
@@ -126,7 +147,7 @@ export function armarAvisoTarea(t: { id: string; proyecto_id: string; titulo: st
     mensaje: texto,
     lineas: [{ etiqueta: t.fecha_limite ? etiqueta(t.fecha_limite < hoyBogota() ? 'vencida' : t.fecha_limite === hoyBogota() ? 'hoy' : 'dias_antes', t.fecha_limite) : 'Tarea', titulo: t.titulo, detalle: t.proyecto || undefined, enlace: enlaceTarea(t) }],
     enlace: enlaceTarea(t),
-    resumenWhatsApp: `${de}«${t.titulo}» — ${texto}`
+    resumenWhatsApp: `${de}${conProyecto(t.titulo, t.proyecto)} — ${texto}`
   };
 }
 
@@ -143,7 +164,7 @@ export function armarAvisoAsignada(
     mensaje: desc ? (desc.length > 280 ? desc.slice(0, 279) + '…' : desc) : null,
     lineas: [{ etiqueta: fechas ? fechas.charAt(0).toUpperCase() + fechas.slice(1) : 'Nueva tarea', color: '#2246C4', titulo: t.titulo, detalle: t.proyecto || undefined, enlace: enlaceTarea(t) }],
     enlace: enlaceTarea(t),
-    resumenWhatsApp: `${deParte} te asignó la tarea «${t.titulo}»${fechas ? ` (${fechas})` : ''}`
+    resumenWhatsApp: `${deParte} te asignó «${t.titulo}»${t.proyecto ? ` en ${t.proyecto}` : ''}${fechas ? ` (${fechas})` : ''} 🫡`
   };
 }
 
@@ -170,11 +191,19 @@ export async function procesarRecordatorios(opciones: { soloUsuario?: string } =
   if (opciones.soloUsuario) qTareas = qTareas.contains('responsables', [opciones.soloUsuario]);
 
   const desde = new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
-  const [{ data: perfiles, error: e1 }, { data: tareasRaw, error: e2 }, { data: enviados, error: e3 }] = await Promise.all([
+  const [{ data: perfiles, error: e1 }, { data: tareasRaw, error: e2 }, { data: enviados, error: e3 }, { data: miembros }] = await Promise.all([
     qPerfiles,
     qTareas,
-    admin.from('recordatorios_enviados').select('tarea_id, user_id, tipo, canal, enviado_el').eq('ok', true).gte('enviado_el', desde).in('tipo', ['dias_antes', 'manana', 'hoy', 'vencida', 'resumen'])
+    admin.from('recordatorios_enviados').select('tarea_id, user_id, tipo, canal, enviado_el').eq('ok', true).gte('enviado_el', desde).in('tipo', ['dias_antes', 'manana', 'hoy', 'vencida', 'resumen']),
+    admin.from('miembros').select('workspace_id, user_id, perfiles(nombre, email)')
   ]);
+  // Compañeros de cada persona (para el remate "{otros} están mirando").
+  const filasMiembros = (miembros || []) as unknown as { workspace_id: string; user_id: string; perfiles: { nombre: string | null; email: string } | null }[];
+  const companeros = (id: string) => {
+    const espacios = new Set(filasMiembros.filter((m) => m.user_id === id).map((m) => m.workspace_id));
+    const nombres = filasMiembros.filter((m) => m.user_id !== id && espacios.has(m.workspace_id) && m.perfiles).map((m) => primerNombre(m.perfiles!));
+    return [...new Set(nombres)];
+  };
   if (e1 || e2 || e3) throw new Error((e1 || e2 || e3)!.message);
 
   const tareas = ((tareasRaw || []) as unknown as (TareaAviso & { proyectos: { nombre: string; archivado: boolean } | null })[]).filter((t) => !t.proyectos?.archivado);
@@ -207,7 +236,7 @@ export async function procesarRecordatorios(opciones: { soloUsuario?: string } =
       const otras = quiereResumen ? mias.filter((t) => !conAlerta.has(t.id)).sort((a, b) => (a.fecha_limite || '9999').localeCompare(b.fecha_limite || '9999')) : [];
       if (!alertas.length && !(quiereResumen && otras.length)) continue;
 
-      const aviso = armarAvisoDiario(p, alertas, otras);
+      const aviso = armarAvisoDiario(p, alertas, otras, companeros(p.id));
       const resultados: Resultado[] = [];
       // Una fila de historial por tarea y tipo; el resumen se guarda aparte.
       const porTipo = new Map<TipoAviso, string[]>();
