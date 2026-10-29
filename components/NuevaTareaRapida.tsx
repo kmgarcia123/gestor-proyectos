@@ -2,30 +2,35 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react';
 import SelectorResponsables from '@/components/SelectorResponsables';
-import { ESTADOS, type Estado, type Perfil } from '@/lib/types';
+import { aplanar } from '@/lib/fases';
+import { ESTADOS, type Estado, type Fase, type Perfil } from '@/lib/types';
 
 export interface DatosNuevaTarea {
   titulo: string;
   responsables: string[];
   fecha_limite: string | null;
+  fase_id: string | null;
 }
 
 interface Props {
   abierta: { estado: Estado; titulo: string } | null;
   equipo: Perfil[];
   yoId: string;
-  faseNombre?: string;
+  fases: Fase[];
+  /** Fase con la que arranca la ficha (la del filtro del tablero, si hay); si no, «Sin fase». */
+  faseInicial?: string;
   onCerrar: () => void;
   /** Crea la tarea. Si «abrir» es true, después se abre el detalle completo. */
   onCrear: (datos: DatosNuevaTarea, abrir: boolean) => Promise<void>;
 }
 
 /** Ficha corta para crear una tarea: nombre, responsables y fecha límite. */
-export default function NuevaTareaRapida({ abierta, equipo, yoId, faseNombre, onCerrar, onCrear }: Props) {
+export default function NuevaTareaRapida({ abierta, equipo, yoId, fases, faseInicial, onCerrar, onCrear }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const [titulo, setTitulo] = useState('');
   const [responsables, setResponsables] = useState<string[]>([yoId]);
   const [fecha, setFecha] = useState('');
+  const [fase, setFase] = useState('');
   const [error, setError] = useState('');
   const [pending, start] = useTransition();
 
@@ -36,17 +41,18 @@ export default function NuevaTareaRapida({ abierta, equipo, yoId, faseNombre, on
       setTitulo(abierta.titulo);
       setResponsables([yoId]);
       setFecha('');
+      setFase(faseInicial || '');
       setError('');
       if (!d.open) d.showModal();
     } else if (d.open) d.close();
-  }, [abierta, yoId]);
+  }, [abierta, yoId, faseInicial]);
 
   function crear(abrir: boolean) {
     const t = titulo.trim();
     if (!t) return setError('Escribe el nombre de la tarea.');
     start(async () => {
       try {
-        await onCrear({ titulo: t, responsables, fecha_limite: fecha || null }, abrir);
+        await onCrear({ titulo: t, responsables, fecha_limite: fecha || null, fase_id: fase || null }, abrir);
         ref.current?.close();
       } catch {
         setError('No se pudo crear la tarea. Revisa tu conexión.');
@@ -73,9 +79,7 @@ export default function NuevaTareaRapida({ abierta, equipo, yoId, faseNombre, on
         <div className="flex items-start justify-between gap-3">
           <div>
             <h2 id="ntr-titulo" className="text-lg font-extrabold">Nueva tarea</h2>
-            <p className="text-xs text-slate-500">
-              En «{columna}»{faseNombre ? ` · fase ${faseNombre}` : ''}
-            </p>
+            <p className="text-xs text-slate-500">En «{columna}»</p>
           </div>
           <button type="button" onClick={() => ref.current?.close()} className="btn-suave h-9 min-h-0 w-9 shrink-0 px-0" aria-label="Cerrar">✕</button>
         </div>
@@ -90,9 +94,20 @@ export default function NuevaTareaRapida({ abierta, equipo, yoId, faseNombre, on
           <SelectorResponsables equipo={equipo} valor={responsables} onCambio={setResponsables} />
         </div>
 
-        <div className="max-w-[220px]">
-          <label className="etiqueta" htmlFor="ntr-fecha">Fecha límite</label>
-          <input id="ntr-fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="campo" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label className="etiqueta" htmlFor="ntr-fecha">Fecha límite</label>
+            <input id="ntr-fecha" type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} className="campo" />
+          </div>
+          <div>
+            <label className="etiqueta" htmlFor="ntr-fase">Fase</label>
+            <select id="ntr-fase" value={fase} onChange={(e) => setFase(e.target.value)} className="campo">
+              <option value="">Sin fase</option>
+              {aplanar(fases).map(({ f, nivel }) => (
+                <option key={f.id} value={f.id}>{'\u00A0\u00A0'.repeat(nivel) + (nivel ? '└ ' : '') + f.nombre}</option>
+              ))}
+            </select>
+          </div>
         </div>
 
         {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>}

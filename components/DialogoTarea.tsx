@@ -201,10 +201,15 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
           )}
         </fieldset>
 
-        <p className="text-xs text-slate-500">
-          Creada el {new Date(form.creado_en).toLocaleString('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
-          {form.creado_por && equipo.find((m) => m.id === form.creado_por) ? ` por ${(equipo.find((m) => m.id === form.creado_por)!.nombre || equipo.find((m) => m.id === form.creado_por)!.email).split(' ')[0]}` : ''}
-        </p>
+        <div className="flex flex-col gap-0.5 text-xs text-slate-500 sm:flex-row sm:flex-wrap sm:gap-x-4">
+          <p>
+            Creada el {new Date(form.creado_en).toLocaleString('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' })}
+            {form.creado_por && equipo.find((m) => m.id === form.creado_por) ? ` por ${(equipo.find((m) => m.id === form.creado_por)!.nombre || equipo.find((m) => m.id === form.creado_por)!.email).split(' ')[0]}` : ''}
+          </p>
+          {form.actualizado_en && Math.abs(new Date(form.actualizado_en).getTime() - new Date(form.creado_en).getTime()) > 60_000 && (
+            <p>Última modificación: {new Date(form.actualizado_en).toLocaleString('es-CO', { timeZone: 'America/Bogota', day: 'numeric', month: 'long', year: 'numeric', hour: 'numeric', minute: '2-digit' })}</p>
+          )}
+        </div>
 
         {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>}
 
