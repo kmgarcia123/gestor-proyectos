@@ -15,12 +15,13 @@
     "@dnd-kit/utilities": "3.2.2",
     "@supabase/ssr": "0.7.0",
     "@supabase/supabase-js": "2.75.0",
-    "next": "15.5.27",
+    "eslint-config-next": "15.5.28",
+    "next": "15.5.28",
     "nodemailer": "10.1.0",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "resend": "6.1.2",
-    "sanitize-html": "2.18.0"
+    "sanitize-html": "2.18.1"
   },
   "devDependencies": {
     "@types/node": "22.18.6",
