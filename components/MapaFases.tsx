@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { actualizarFase, crearFase, eliminarFase, guardarPosiciones, intercambiarFases, ordenarMapa } from '@/app/(app)/actions';
+import { actualizarFase, crearFase, eliminarFase, guardarPosiciones, guardarPosicionProyecto, intercambiarFases, ordenarMapa } from '@/app/(app)/actions';
 import { aplanar, avanceFase, conDescendientes, hijosPorPadre } from '@/lib/fases';
 import type { EstadoFase, Fase, Proyecto, Tarea } from '@/lib/types';
 
@@ -67,10 +67,16 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
   // Posiciones ya soltadas que todavía no llegan de la base: se respetan para que el cuadro no "salte" atrás.
   const [fijas, setFijas] = useState<Map<string, Punto>>(new Map());
   const ultimas = useRef<Map<string, Punto>>(new Map());
+  // Cuadro principal (proyecto): posición mientras se arrastra y la ya soltada que aún no llega de la base.
+  const [raizTemporal, setRaizTemporal] = useState<Punto | null>(null);
+  const [raizFija, setRaizFija] = useState<Punto | null>(null);
+  const arrastreRaiz = useRef<{ inicio: Punto; origen: Punto; movio: boolean; ultima: Punto | null } | null>(null);
   const arrastre = useRef<{ id: string; ids: string[]; inicio: Punto; origen: Map<string, Punto>; movio: boolean } | null>(null);
   const hijos = hijosPorPadre(fases);
 
   const auto = layoutAutomatico(fases);
+  const raiz: Punto =
+    raizTemporal || raizFija || (proyecto.mapa_x != null && proyecto.mapa_y != null ? { x: proyecto.mapa_x, y: proyecto.mapa_y } : auto.raiz);
   const posDe = (f: Fase): Punto =>
     temporal.get(f.id) || fijas.get(f.id) || (f.pos_x != null && f.pos_y != null ? { x: f.pos_x, y: f.pos_y } : auto.pos.get(f.id) || { x: MARGEN, y: MARGEN });
 
@@ -85,15 +91,44 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
     if (sigue.size !== fijas.size) setFijas(sigue);
   }, [fases, fijas]);
   const posiciones = new Map(fases.map((f) => [f.id, posDe(f)]));
-  const libres = fases.some((f) => f.pos_x != null) || fijas.size > 0;
+  const libres = fases.some((f) => f.pos_x != null) || fijas.size > 0 || proyecto.mapa_x != null || raizFija !== null;
 
-  const anchoLienzo = Math.max(auto.raiz.x + RAIZ_W, ...[...posiciones.values()].map((p) => p.x + W)) + MARGEN;
-  const altoLienzo = Math.max(auto.raiz.y + RAIZ_H, ...[...posiciones.values()].map((p) => p.y + H)) + MARGEN;
+  useEffect(() => {
+    if (raizFija && proyecto.mapa_x != null && proyecto.mapa_y != null && Math.abs(proyecto.mapa_x - raizFija.x) < 2 && Math.abs(proyecto.mapa_y - raizFija.y) < 2) setRaizFija(null);
+  }, [proyecto.mapa_x, proyecto.mapa_y, raizFija]);
+
+  function raizPresionar(e: React.PointerEvent) {
+    if ((e.target as HTMLElement).closest('[data-accion]')) return;
+    arrastreRaiz.current = { inicio: { x: e.clientX, y: e.clientY }, origen: raiz, movio: false, ultima: null };
+    (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+  }
+  function raizMover(e: React.PointerEvent) {
+    const a = arrastreRaiz.current;
+    if (!a) return;
+    const dx = e.clientX - a.inicio.x;
+    const dy = e.clientY - a.inicio.y;
+    if (!a.movio && Math.hypot(dx, dy) < 5) return;
+    a.movio = true;
+    a.ultima = { x: Math.round(Math.max(0, a.origen.x + dx)), y: Math.round(Math.max(0, a.origen.y + dy)) };
+    setRaizTemporal(a.ultima);
+  }
+  function raizSoltar() {
+    const a = arrastreRaiz.current;
+    arrastreRaiz.current = null;
+    if (!a || !a.movio || !a.ultima) return;
+    const p = a.ultima;
+    setRaizFija(p);
+    setRaizTemporal(null);
+    guardarPosicionProyecto(proyecto.id, p.x, p.y).catch(() => setRaizFija(null));
+  }
+
+  const anchoLienzo = Math.max(raiz.x + RAIZ_W, ...[...posiciones.values()].map((p) => p.x + W)) + MARGEN;
+  const altoLienzo = Math.max(raiz.y + RAIZ_H, ...[...posiciones.values()].map((p) => p.y + H)) + MARGEN;
 
   // En pantallas angostas, arrancar con el proyecto (la raíz) centrado.
   useEffect(() => {
     const el = lienzo.current;
-    if (el && el.scrollWidth > el.clientWidth) el.scrollLeft = auto.raiz.x + RAIZ_W / 2 - el.clientWidth / 2;
+    if (el && el.scrollWidth > el.clientWidth) el.scrollLeft = raiz.x + RAIZ_W / 2 - el.clientWidth / 2;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -232,7 +267,7 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
         <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded border-2 border-turquesa bg-turquesa-suave" />Ejecutada · {conteo.hecho}</span>
         <span className="text-slate-500 sm:ml-auto">Arrastra los cuadros para acomodarlos · Clic para ver sus tareas</span>
         {libres && (
-          <button type="button" disabled={pending} onClick={() => (setFijas(new Map()), start(() => ordenarMapa(proyecto.id)))} className="btn-suave min-h-0 py-1.5 text-xs">
+          <button type="button" disabled={pending} onClick={() => (setFijas(new Map()), setRaizFija(null), start(() => ordenarMapa(proyecto.id)))} className="btn-suave min-h-0 py-1.5 text-xs">
             Ordenar automáticamente
           </button>
         )}
@@ -243,12 +278,23 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
           <svg className="pointer-events-none absolute inset-0" width={anchoLienzo} height={altoLienzo} aria-hidden="true">
             {fases.map((f) => {
               const padre = f.parent_id ? fases.find((x) => x.id === f.parent_id) : null;
-              const d = padre ? linea(posiciones.get(padre.id)!, W, H, posiciones.get(f.id)!) : linea(auto.raiz, RAIZ_W, RAIZ_H, posiciones.get(f.id)!);
+              const d = padre ? linea(posiciones.get(padre.id)!, W, H, posiciones.get(f.id)!) : linea(raiz, RAIZ_W, RAIZ_H, posiciones.get(f.id)!);
               return <path key={f.id} d={d} fill="none" stroke="#CBD5E1" strokeWidth={2} />;
             })}
           </svg>
 
-          <div className="absolute rounded-2xl bg-carbon p-4 text-white shadow-md" style={{ left: auto.raiz.x, top: auto.raiz.y, width: RAIZ_W, height: RAIZ_H }}>
+          <div
+            onPointerDown={raizPresionar}
+            onPointerMove={raizMover}
+            onPointerUp={raizSoltar}
+            onPointerCancel={() => {
+              arrastreRaiz.current = null;
+              setRaizTemporal(null);
+            }}
+            className={`absolute select-none rounded-2xl bg-carbon p-4 text-white shadow-md ${raizTemporal ? 'z-30 cursor-grabbing shadow-xl' : 'z-10 cursor-grab'}`}
+            style={{ left: raiz.x, top: raiz.y, width: RAIZ_W, height: RAIZ_H, touchAction: 'none' }}
+            title="Arrastra para mover"
+          >
             <div className="flex items-center gap-2">
               <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: proyecto.color }} aria-hidden="true" />
               <p className="truncate font-extrabold">{proyecto.nombre}</p>
@@ -259,7 +305,7 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
               </div>
               <span className="text-xs font-bold">{pctProyecto}%</span>
             </div>
-            <button type="button" onClick={() => setEditor({ modo: 'nueva', padre: null })} className="mt-3 w-full rounded-xl bg-white/10 px-3 py-1.5 text-xs font-bold hover:bg-white/20">
+            <button type="button" data-accion onClick={() => setEditor({ modo: 'nueva', padre: null })} className="mt-3 w-full rounded-xl bg-white/10 px-3 py-1.5 text-xs font-bold hover:bg-white/20">
               + Agregar fase
             </button>
           </div>
@@ -267,7 +313,7 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
           {fases.map((f) => nodo(f))}
 
           {fases.length === 0 && (
-            <p className="absolute max-w-sm text-center text-sm text-slate-500" style={{ left: auto.raiz.x - 40, top: auto.raiz.y + RAIZ_H + 32, width: RAIZ_W + 80 }}>
+            <p className="absolute max-w-sm text-center text-sm text-slate-500" style={{ left: raiz.x - 40, top: raiz.y + RAIZ_H + 32, width: RAIZ_W + 80 }}>
               Aún no hay fases. Agrega la primera (por ejemplo «Diagnóstico» o «Diseño») y luego sus subfases.
             </p>
           )}

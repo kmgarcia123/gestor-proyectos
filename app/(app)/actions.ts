@@ -173,10 +173,18 @@ export async function guardarPosiciones(proyectoId: string, posiciones: { id: st
   revalidatePath(`/proyectos/${proyectoId}`);
 }
 
+/** Guarda dónde quedó el cuadro principal (el proyecto) en el mapa. */
+export async function guardarPosicionProyecto(proyectoId: string, x: number | null, y: number | null) {
+  const { supabase } = await getContexto();
+  const n = (v: number | null) => (v === null || !Number.isFinite(v) ? null : Math.max(0, Math.min(20000, Math.round(v))));
+  await supabase.from('proyectos').update({ mapa_x: n(x), mapa_y: n(y) }).eq('id', proyectoId);
+}
+
 /** Vuelve a ordenar todo el mapa en forma de árbol automático. */
 export async function ordenarMapa(proyectoId: string) {
   const { supabase } = await getContexto();
   await supabase.from('fases').update({ pos_x: null, pos_y: null }).eq('proyecto_id', proyectoId);
+  await supabase.from('proyectos').update({ mapa_x: null, mapa_y: null }).eq('id', proyectoId);
   revalidatePath(`/proyectos/${proyectoId}`);
 }
 

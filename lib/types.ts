@@ -18,6 +18,9 @@ export interface Proyecto {
   fecha_fin: string | null;
   archivado: boolean;
   creado_en: string;
+  /** Posición del cuadro del proyecto en el mapa de fases (vacía = arriba al centro). */
+  mapa_x?: number | null;
+  mapa_y?: number | null;
 }
 
 export type EstadoFase = 'pendiente' | 'curso' | 'hecho';
