@@ -36,6 +36,8 @@ export interface Aviso {
   mensaje?: string | null; // texto personalizado ("Por favor haz la tarea")
   lineas: LineaAviso[];
   enlace?: string; // botón principal
+  /** Frase jocosa al final (lib/frases-whatsapp.ts). */
+  remate?: string;
   /** Texto de una sola línea para la plantilla de WhatsApp. */
   resumenWhatsApp: string;
 }
@@ -119,6 +121,7 @@ export function htmlAviso(dest: Destinatario, aviso: Aviso) {
       ${chips ? `<div style="margin:0 0 6px">${chips}</div>` : ''}
       ${mensaje}
       ${filas ? `<table width="100%" cellspacing="0" cellpadding="0">${filas}</table>` : ''}
+      ${aviso.remate ? `<p style="margin:20px 0 0;color:#6E6E73;font-size:14px;text-align:center">${escapar(aviso.remate)}</p>` : ''}
       ${aviso.enlace ? `<p style="margin:26px 0 0;text-align:center"><a href="${escapar(aviso.enlace)}" style="display:inline-block;background:#2246C4;color:#FFFFFF;padding:13px 26px;border-radius:999px;text-decoration:none;font-weight:700;font-size:15px">Abrir ${escapar(APP())}</a></p>` : ''}
     </div>
     <div style="padding:14px 24px;border-top:1px solid #EEF2F7;font-size:12px;color:#8A8A90">

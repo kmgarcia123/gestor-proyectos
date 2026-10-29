@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { getContexto } from '@/lib/datos';
-import { normalizarTelefono, notificar, type Canal } from '@/lib/notificar';
+import { normalizarTelefono, notificar, primerNombre, type Canal } from '@/lib/notificar';
 import { armarAvisoDiario, CAMPOS_PERFIL, tipoDiario, type PerfilAvisos } from '@/lib/recordatorios';
 import { hoyBogota } from '@/lib/fechas';
 
@@ -42,7 +42,7 @@ export async function guardarAvisos(_prev: Estado, formData: FormData): Promise<
 
 /** Envía a uno mismo una prueba con sus tareas reales, sin afectar los avisos automáticos. */
 export async function probarCanal(canal: Canal): Promise<Estado> {
-  const { supabase, user } = await getContexto();
+  const { supabase, user, equipo } = await getContexto();
   const { data: p } = await supabase.from('perfiles').select(CAMPOS_PERFIL).eq('id', user.id).single();
   if (!p) return { ok: false, texto: 'No se encontró tu perfil.' };
   const yo = p as PerfilAvisos;
@@ -61,7 +61,8 @@ export async function probarCanal(canal: Canal): Promise<Estado> {
     return tipo ? [{ tarea: t, tipo }] : [];
   });
   const ids = new Set(alertas.map((a) => a.tarea.id));
-  const aviso = armarAvisoDiario(yo, alertas, lista.filter((t) => !ids.has(t.id)));
+  const otros = equipo.filter((m) => m.id !== user.id).map((m) => primerNombre(m));
+  const aviso = armarAvisoDiario(yo, alertas, lista.filter((t) => !ids.has(t.id)), otros);
   aviso.asunto = `Prueba · ${aviso.asunto}`;
   if (!lista.length) aviso.resumenWhatsApp = 'esto es una prueba, no tienes tareas pendientes';
 
