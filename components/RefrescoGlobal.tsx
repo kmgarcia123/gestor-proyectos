@@ -27,6 +27,7 @@ export default function RefrescoGlobal() {
         .channel('global')
         .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes_nombre' }, refrescar)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'proyectos' }, refrescar)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes_eliminacion' }, refrescar)
         .subscribe();
     })();
     const alVolver = () => document.visibilityState === 'visible' && refrescar();

@@ -6,6 +6,7 @@ import { aHtml, sanitizarHtmlCliente } from '@/lib/html-cliente';
 const COLORES = ['#182333', '#B42318', '#D9703F', '#B54708', '#027A48', '#2246C4', '#7C3AED', '#6E6E73'];
 const RESALTADOS = ['#FEF08A', '#BBF7D0', '#BFDBFE', '#FBCFE8', '#FED7AA', 'transparent'];
 const TAMANOS: [string, string][] = [['2', 'Pequeño'], ['3', 'Normal'], ['5', 'Grande'], ['6', 'Muy grande']];
+const ACTIVABLES = ['bold', 'italic', 'underline', 'strikeThrough', 'insertUnorderedList', 'insertOrderedList'];
 const LETRAS: [string, string][] = [['', 'Predeterminada'], ['Georgia, serif', 'Serif'], ['ui-monospace, monospace', 'Monoespaciada'], ['"Comic Sans MS", cursive', 'Manuscrita']];
 
 /**
@@ -16,6 +17,29 @@ export default function EditorTexto({ id, valor, onCambio, placeholder }: { id: 
   const ref = useRef<HTMLDivElement>(null);
   const [vacio, setVacio] = useState(!valor);
   const [panel, setPanel] = useState<'color' | 'resaltar' | null>(null);
+  const [activos, setActivos] = useState<Record<string, boolean>>({});
+
+  // Marca en la barra el formato que tiene el texto donde está el cursor (negrita, cursiva, listas…).
+  function leerActivos() {
+    const el = ref.current;
+    const sel = document.getSelection();
+    if (!el || !sel || !sel.anchorNode || !el.contains(sel.anchorNode)) return setActivos({});
+    const n: Record<string, boolean> = {};
+    for (const c of ACTIVABLES) {
+      try {
+        n[c] = document.queryCommandState(c);
+      } catch {
+        n[c] = false;
+      }
+    }
+    setActivos((a) => (ACTIVABLES.every((c) => a[c] === n[c]) ? a : n));
+  }
+
+  useEffect(() => {
+    document.addEventListener('selectionchange', leerActivos);
+    return () => document.removeEventListener('selectionchange', leerActivos);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Carga el contenido al abrir otra tarea (no mientras se escribe, para no mover el cursor).
   useEffect(() => {
@@ -39,6 +63,7 @@ export default function EditorTexto({ id, valor, onCambio, placeholder }: { id: 
     document.execCommand('styleWithCSS', false, nombre === 'fontSize' ? 'false' : 'true');
     document.execCommand(nombre, false, valor);
     emitir();
+    leerActivos();
   }
 
   const Boton = ({ titulo, onClick, children, activo = false }: { titulo: string; onClick: () => void; children: React.ReactNode; activo?: boolean }) => (
@@ -48,7 +73,8 @@ export default function EditorTexto({ id, valor, onCambio, placeholder }: { id: 
       aria-label={titulo}
       onMouseDown={(e) => e.preventDefault()}
       onClick={onClick}
-      className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-1.5 text-sm transition hover:bg-white ${activo ? 'bg-white shadow-sm' : ''}`}
+      aria-pressed={activo}
+      className={`flex h-8 min-w-8 items-center justify-center rounded-lg px-1.5 text-sm transition ${activo ? 'bg-azul-suave text-azul-oscuro ring-1 ring-azul/40' : 'hover:bg-white'}`}
     >
       {children}
     </button>
@@ -57,10 +83,10 @@ export default function EditorTexto({ id, valor, onCambio, placeholder }: { id: 
   return (
     <div className="rounded-xl border border-slate-300 bg-white focus-within:border-azul focus-within:ring-2 focus-within:ring-azul/20">
       <div className="flex flex-wrap items-center gap-0.5 border-b border-slate-200 bg-fondo px-1.5 py-1" role="toolbar" aria-label="Formato del texto">
-        <Boton titulo="Negrita (Ctrl+B)" onClick={() => cmd('bold')}><b>B</b></Boton>
-        <Boton titulo="Cursiva (Ctrl+I)" onClick={() => cmd('italic')}><i className="font-serif">I</i></Boton>
-        <Boton titulo="Subrayado (Ctrl+U)" onClick={() => cmd('underline')}><u>U</u></Boton>
-        <Boton titulo="Tachado" onClick={() => cmd('strikeThrough')}><s>S</s></Boton>
+        <Boton titulo="Negrita (Ctrl+B)" onClick={() => cmd('bold')} activo={activos.bold}><b>B</b></Boton>
+        <Boton titulo="Cursiva (Ctrl+I)" onClick={() => cmd('italic')} activo={activos.italic}><i className="font-serif">I</i></Boton>
+        <Boton titulo="Subrayado (Ctrl+U)" onClick={() => cmd('underline')} activo={activos.underline}><u>U</u></Boton>
+        <Boton titulo="Tachado" onClick={() => cmd('strikeThrough')} activo={activos.strikeThrough}><s>S</s></Boton>
         <span className="mx-1 h-5 w-px bg-slate-300" aria-hidden="true" />
 
         <div className="relative">
@@ -101,10 +127,10 @@ export default function EditorTexto({ id, valor, onCambio, placeholder }: { id: 
         </select>
         <span className="mx-1 h-5 w-px bg-slate-300" aria-hidden="true" />
 
-        <Boton titulo="Lista con viñetas" onClick={() => cmd('insertUnorderedList')}>
+        <Boton titulo="Lista con viñetas" onClick={() => cmd('insertUnorderedList')} activo={activos.insertUnorderedList}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M9 6h11M9 12h11M9 18h11" /><circle cx="4.5" cy="6" r="1" fill="currentColor" /><circle cx="4.5" cy="12" r="1" fill="currentColor" /><circle cx="4.5" cy="18" r="1" fill="currentColor" /></svg>
         </Boton>
-        <Boton titulo="Lista numerada" onClick={() => cmd('insertOrderedList')}>
+        <Boton titulo="Lista numerada" onClick={() => cmd('insertOrderedList')} activo={activos.insertOrderedList}>
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><path d="M10 6h10M10 12h10M10 18h10M4 5h1v4M4 9h2M4 14.5a1 1 0 0 1 2 0c0 1-2 1.5-2 3h2" /></svg>
         </Boton>
         <Boton titulo="Quitar formato" onClick={() => cmd('removeFormat')}>
@@ -122,7 +148,10 @@ export default function EditorTexto({ id, valor, onCambio, placeholder }: { id: 
           aria-multiline="true"
           aria-label="Descripción"
           onInput={emitir}
-          onBlur={emitir}
+          onKeyUp={leerActivos}
+          onMouseUp={leerActivos}
+          onFocus={leerActivos}
+          onBlur={() => (emitir(), setActivos({}))}
           onPaste={(e) => {
             // Al pegar desde Word o una página, se deja solo el formato básico.
             const html = e.clipboardData.getData('text/html');

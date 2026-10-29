@@ -3,6 +3,8 @@ import Avatar from '@/components/Avatar';
 import ProyectoVista from '@/components/ProyectoVista';
 import EditarProyecto from '@/components/EditarProyecto';
 import SolicitudNombre, { type Solicitud } from '@/components/SolicitudNombre';
+import SolicitudEliminacion, { type PendienteEliminar } from '@/components/SolicitudEliminacion';
+import BotonFijar from '@/components/BotonFijar';
 import { getContexto } from '@/lib/datos';
 import { formatoCorto } from '@/lib/fechas';
 import type { Fase, Tarea } from '@/lib/types';
@@ -12,15 +14,17 @@ export const dynamic = 'force-dynamic';
 export default async function ProyectoPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ tarea?: string; vista?: string }> }) {
   const { id } = await params;
   const { tarea: tareaAbierta, vista } = await searchParams;
-  const { supabase, equipo, proyectos, yo } = await getContexto();
+  const { supabase, equipo, proyectos, yo, fijados } = await getContexto();
   const proyecto = proyectos.find((p) => p.id === id);
   if (!proyecto) notFound();
 
-  const [{ data: fases }, { data: tareas }, { data: solicitud }] = await Promise.all([
+  const [{ data: fases }, { data: tareas }, { data: solicitud }, { data: eliminaciones }] = await Promise.all([
     supabase.from('fases').select('*').eq('proyecto_id', id).order('posicion'),
     supabase.from('tareas').select('*, adjuntos(count)').eq('proyecto_id', id).order('posicion'),
-    supabase.from('solicitudes_nombre').select('id, proyecto_id, nombre_actual, nombre_nuevo, solicitado_por, aprobaciones').eq('proyecto_id', id).eq('estado', 'pendiente').maybeSingle()
+    supabase.from('solicitudes_nombre').select('id, proyecto_id, nombre_actual, nombre_nuevo, solicitado_por, aprobaciones').eq('proyecto_id', id).eq('estado', 'pendiente').maybeSingle(),
+    supabase.from('solicitudes_eliminacion').select('id, tipo, objeto_id, nombre, proyecto_id, solicitado_por, aprobaciones').eq('proyecto_id', id).eq('estado', 'pendiente').order('creado_en')
   ]);
+  const pendientes = (eliminaciones || []) as PendienteEliminar[];
   // adjuntos(count) llega como [{ count: n }]; se deja como número.
   const ts = ((tareas || []) as (Tarea & { adjuntos?: { count: number }[] })[]).map(({ adjuntos, ...t }) => ({ ...t, adjuntos_total: adjuntos?.[0]?.count ?? 0 })) as Tarea[];
   const hechas = ts.filter((t) => t.estado === 'hecho').length;
@@ -34,7 +38,8 @@ export default async function ProyectoPage({ params, searchParams }: { params: P
             <div className="flex items-center gap-2">
               <span className="h-3 w-3 rounded-full" style={{ background: proyecto.color }} aria-hidden="true" />
               <h1 className="truncate text-2xl font-extrabold tracking-tight">{proyecto.nombre}</h1>
-              <EditarProyecto proyecto={proyecto} totalEquipo={equipo.length} hayPendiente={!!solicitud} />
+              <EditarProyecto proyecto={proyecto} totalEquipo={equipo.length} hayPendiente={!!solicitud} eliminacionPendiente={pendientes.some((p) => p.tipo === 'proyecto')} />
+              <BotonFijar proyectoId={proyecto.id} fijado={fijados.includes(proyecto.id)} />
             </div>
             {proyecto.descripcion && <p className="mt-1 max-w-2xl text-sm text-slate-500">{proyecto.descripcion}</p>}
           </div>
@@ -57,6 +62,13 @@ export default async function ProyectoPage({ params, searchParams }: { params: P
           </div>
         </div>
         {solicitud && <SolicitudNombre s={solicitud as Solicitud} equipo={equipo} yoId={yo.id} />}
+        {pendientes.length > 0 && (
+          <div className="mt-4 flex flex-col gap-2">
+            {pendientes.map((p) => (
+              <SolicitudEliminacion key={p.id} s={p} equipo={equipo} yoId={yo.id} detalle={p.tipo === 'proyecto' ? 'con todas sus fases y tareas' : p.tipo === 'fase' ? 'sus tareas quedan sin fase' : undefined} />
+            ))}
+          </div>
+        )}
       </header>
       <ProyectoVista
         key={id}
@@ -67,6 +79,7 @@ export default async function ProyectoPage({ params, searchParams }: { params: P
         yoId={yo.id}
         tareaAbiertaId={tareaAbierta}
         vistaInicial={vista === 'mapa' ? 'mapa' : 'tablero'}
+        eliminaciones={pendientes}
       />
     </div>
   );

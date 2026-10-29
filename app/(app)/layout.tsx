@@ -9,7 +9,7 @@ import { getContexto } from '@/lib/datos';
 export const dynamic = 'force-dynamic';
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const { yo, proyectos, workspaceNombre } = await getContexto();
+  const { yo, proyectos, workspaceNombre, fijados } = await getContexto();
   const app = NOMBRE_APP;
 
   const marca = (
@@ -48,7 +48,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {marca}
         <NuevoProyecto compacto />
         <div className="flex-1">
-          <NavProyectos proyectos={proyectos} />
+          <NavProyectos proyectos={proyectos} fijados={fijados} />
         </div>
         {usuario}
       </MenuMovil>
@@ -58,7 +58,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         {marca}
         <NuevoProyecto compacto />
         <div className="flex-1 overflow-y-auto">
-          <NavProyectos proyectos={proyectos} />
+          <NavProyectos proyectos={proyectos} fijados={fijados} />
         </div>
         {usuario}
       </aside>

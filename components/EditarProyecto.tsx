@@ -1,11 +1,14 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
-import { actualizarProyecto, solicitarCambioNombre } from '@/app/(app)/actions';
+import { useRouter } from 'next/navigation';
+import { actualizarProyecto, solicitarCambioNombre, solicitarEliminacion } from '@/app/(app)/actions';
 import { COLORES_PROYECTO, type Proyecto } from '@/lib/types';
 
 /** Editar el proyecto: descripción y color se guardan al instante; el nombre pasa por aprobación del equipo. */
-export default function EditarProyecto({ proyecto, totalEquipo, hayPendiente }: { proyecto: Proyecto; totalEquipo: number; hayPendiente: boolean }) {
+export default function EditarProyecto({ proyecto, totalEquipo, hayPendiente, eliminacionPendiente = false }: { proyecto: Proyecto; totalEquipo: number; hayPendiente: boolean; eliminacionPendiente?: boolean }) {
+  const router = useRouter();
+  const [confirmarBorrar, setConfirmarBorrar] = useState(false);
   const ref = useRef<HTMLDialogElement>(null);
   const [nombre, setNombre] = useState(proyecto.nombre);
   const [descripcion, setDescripcion] = useState(proyecto.descripcion || '');
@@ -18,6 +21,7 @@ export default function EditarProyecto({ proyecto, totalEquipo, hayPendiente }: 
     setDescripcion(proyecto.descripcion || '');
     setColor(proyecto.color);
     setAviso(null);
+    setConfirmarBorrar(false);
     ref.current?.showModal();
   }
 
@@ -36,6 +40,23 @@ export default function EditarProyecto({ proyecto, totalEquipo, hayPendiente }: 
         }
       } catch {
         setAviso({ ok: false, texto: 'No se pudo guardar. Revisa tu conexión.' });
+      }
+    });
+  }
+
+  function pedirEliminacion() {
+    start(async () => {
+      try {
+        const r = await solicitarEliminacion('proyecto', proyecto.id);
+        setConfirmarBorrar(false);
+        if (r.estado === 'aprobada') {
+          ref.current?.close();
+          router.push('/');
+          return;
+        }
+        setAviso({ ok: r.estado === 'pendiente', texto: r.texto });
+      } catch {
+        setAviso({ ok: false, texto: 'No se pudo enviar la solicitud. Revisa tu conexión.' });
       }
     });
   }
@@ -86,7 +107,29 @@ export default function EditarProyecto({ proyecto, totalEquipo, hayPendiente }: 
           <div className="pie-acciones">
             <button type="submit" disabled={pending} className="btn-primario">{pending ? 'Guardando…' : cambiaNombre ? 'Guardar y pedir aprobación' : 'Guardar cambios'}</button>
             <button type="button" onClick={() => ref.current?.close()} className="btn-ghost">Cerrar sin guardar</button>
+            <div className="separador-destructivo">
+              {eliminacionPendiente ? (
+                <span className="text-xs font-semibold text-red-700">Eliminación pendiente: se vota en el aviso rojo</span>
+              ) : (
+                <button type="button" onClick={() => setConfirmarBorrar(true)} disabled={pending} className="btn-destructivo">Eliminar proyecto</button>
+              )}
+            </div>
           </div>
+          {confirmarBorrar && (
+            <div role="alertdialog" aria-labelledby="ep-borrar" className="rounded-2xl border border-red-200 bg-red-50 p-4">
+              <p id="ep-borrar" className="text-sm font-bold text-red-800">¿Pedir que se elimine «{proyecto.nombre}»?</p>
+              <p className="mt-1 text-sm text-red-700">
+                Se borran el proyecto, sus fases, tareas y archivos.
+                {totalEquipo > 1 ? ` Solo pasa cuando lo aprueben los ${totalEquipo} miembros del equipo; a los demás les llega un aviso.` : ''}
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button type="button" onClick={pedirEliminacion} disabled={pending} className="btn-destructivo bg-white">
+                  {pending ? 'Enviando…' : totalEquipo > 1 ? 'Pedir eliminación del proyecto' : 'Eliminar proyecto definitivamente'}
+                </button>
+                <button type="button" onClick={() => setConfirmarBorrar(false)} className="btn-ghost">Conservar proyecto</button>
+              </div>
+            </div>
+          )}
         </form>
       </dialog>
     </>
