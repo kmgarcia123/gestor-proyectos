@@ -121,8 +121,14 @@ export function armarAvisoDiario(p: PerfilAvisos, alertas: { tarea: TareaAviso; 
   }
 
   // WhatsApp: hasta 3 tareas con su proyecto, el resto como "y N pendientes más", y un remate.
-  const destacadas = alertas.slice(0, 3).map((a) => `${EMOJI[a.tipo]}: ${conProyecto(a.tarea.titulo, a.tarea.proyectos?.nombre)}`);
-  if (!destacadas.length) destacadas.push(...otras.slice(0, 3).map((t) => `📌 ${conProyecto(t.titulo, t.proyectos?.nombre)}`));
+  // Si todas las tareas mostradas son del mismo proyecto, se nombra una sola vez al inicio.
+  const mostradas = alertas.length ? alertas.slice(0, 3).map((a) => a.tarea) : otras.slice(0, 3);
+  const proyectos = new Set(mostradas.map((t) => t.proyectos?.nombre || ''));
+  const unico = proyectos.size === 1 ? [...proyectos][0] : '';
+  const nombreTarea = (t: TareaAviso) => (unico ? `«${t.titulo}»` : conProyecto(t.titulo, t.proyectos?.nombre));
+  const destacadas = alertas.slice(0, 3).map((a) => `${EMOJI[a.tipo]}: ${nombreTarea(a.tarea)}`);
+  if (!destacadas.length) destacadas.push(...otras.slice(0, 3).map((t) => `📌 ${nombreTarea(t)}`));
+  if (unico && destacadas.length) destacadas[0] = `en ${unico} → ${destacadas[0]}`;
   const restantes = alertas.length + otras.length - destacadas.length;
   const cola = restantes > 0 ? `${destacadas.length ? 'y ' : ''}${restantes} pendiente${restantes === 1 ? '' : 's'} más` : '';
   const chiste = remate(otrosNombres);
