@@ -64,13 +64,28 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
   const lienzo = useRef<HTMLDivElement>(null);
   // Posiciones mientras se arrastra (antes de guardarlas).
   const [temporal, setTemporal] = useState<Map<string, Punto>>(new Map());
+  // Posiciones ya soltadas que todavía no llegan de la base: se respetan para que el cuadro no "salte" atrás.
+  const [fijas, setFijas] = useState<Map<string, Punto>>(new Map());
+  const ultimas = useRef<Map<string, Punto>>(new Map());
   const arrastre = useRef<{ id: string; ids: string[]; inicio: Punto; origen: Map<string, Punto>; movio: boolean } | null>(null);
   const hijos = hijosPorPadre(fases);
 
   const auto = layoutAutomatico(fases);
-  const posDe = (f: Fase): Punto => temporal.get(f.id) || (f.pos_x != null && f.pos_y != null ? { x: f.pos_x, y: f.pos_y } : auto.pos.get(f.id) || { x: MARGEN, y: MARGEN });
+  const posDe = (f: Fase): Punto =>
+    temporal.get(f.id) || fijas.get(f.id) || (f.pos_x != null && f.pos_y != null ? { x: f.pos_x, y: f.pos_y } : auto.pos.get(f.id) || { x: MARGEN, y: MARGEN });
+
+  // Cuando la base ya trae la posición guardada, se suelta la copia local.
+  useEffect(() => {
+    if (!fijas.size) return;
+    const sigue = new Map(fijas);
+    for (const f of fases) {
+      const p = sigue.get(f.id);
+      if (p && f.pos_x != null && f.pos_y != null && Math.abs(f.pos_x - p.x) < 2 && Math.abs(f.pos_y - p.y) < 2) sigue.delete(f.id);
+    }
+    if (sigue.size !== fijas.size) setFijas(sigue);
+  }, [fases, fijas]);
   const posiciones = new Map(fases.map((f) => [f.id, posDe(f)]));
-  const libres = fases.some((f) => f.pos_x != null);
+  const libres = fases.some((f) => f.pos_x != null) || fijas.size > 0;
 
   const anchoLienzo = Math.max(auto.raiz.x + RAIZ_W, ...[...posiciones.values()].map((p) => p.x + W)) + MARGEN;
   const altoLienzo = Math.max(auto.raiz.y + RAIZ_H, ...[...posiciones.values()].map((p) => p.y + H)) + MARGEN;
@@ -115,8 +130,9 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
     const sig = new Map<string, Punto>();
     for (const id of a.ids) {
       const o = a.origen.get(id)!;
-      sig.set(id, { x: Math.max(0, o.x + dx), y: Math.max(RAIZ_H / 2, o.y + dy) });
+      sig.set(id, { x: Math.round(Math.max(0, o.x + dx)), y: Math.round(Math.max(RAIZ_H / 2, o.y + dy)) });
     }
+    ultimas.current = sig;
     setTemporal(sig);
   }
   function alSoltar(f: Fase) {
@@ -124,13 +140,24 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
     arrastre.current = null;
     if (!a) return;
     if (!a.movio) return onVerTareas(f.id); // fue un clic: ver sus tareas
-    const finales = temporal;
+    const finales = ultimas.current;
     // Las demás fases que seguían en automático se "congelan" donde están, para que no salten de lugar.
     const resto = fases.filter((x) => !finales.has(x.id) && x.pos_x == null).map((x) => ({ id: x.id, ...posiciones.get(x.id)! }));
     const cambios = [...[...finales.entries()].map(([id, p]) => ({ id, x: p.x, y: p.y })), ...resto];
-    start(async () => {
-      await guardarPosiciones(proyecto.id, cambios);
-      setTemporal(new Map());
+    // Queda donde se soltó de inmediato; se guarda en segundo plano.
+    setFijas((prev) => {
+      const m = new Map(prev);
+      cambios.forEach((c) => m.set(c.id, { x: Math.round(c.x), y: Math.round(c.y) }));
+      return m;
+    });
+    setTemporal(new Map());
+    ultimas.current = new Map();
+    guardarPosiciones(proyecto.id, cambios).catch(() => {
+      setFijas((prev) => {
+        const m = new Map(prev);
+        cambios.forEach((c) => m.delete(c.id));
+        return m;
+      });
     });
   }
 
@@ -205,7 +232,7 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
         <span className="flex items-center gap-1.5"><span className="h-3 w-3 rounded border-2 border-turquesa bg-turquesa-suave" />Ejecutada · {conteo.hecho}</span>
         <span className="text-slate-500 sm:ml-auto">Arrastra los cuadros para acomodarlos · Clic para ver sus tareas</span>
         {libres && (
-          <button type="button" disabled={pending} onClick={() => start(() => ordenarMapa(proyecto.id))} className="btn-suave min-h-0 py-1.5 text-xs">
+          <button type="button" disabled={pending} onClick={() => (setFijas(new Map()), start(() => ordenarMapa(proyecto.id)))} className="btn-suave min-h-0 py-1.5 text-xs">
             Ordenar automáticamente
           </button>
         )}
