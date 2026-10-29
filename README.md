@@ -29,6 +29,14 @@ Pensada para uso interno, pero **multi-espacio desde el día 1**: todo pertenece
 - **Mapa de fases** (pestaña del proyecto): fases y subfases como cuadros conectados con líneas, coloreados por avance. Los cuadros se **arrastran** a cualquier parte (se mueven con sus subfases) y hay «Ordenar automáticamente». Se agregan, editan y eliminan; estado manual opcional. Clic en un cuadro filtra el tablero por esa fase.
 - Base de datos: `supabase/migrations/0003_responsables_fechas_mapa.sql` y `0004_pasos_y_mapa_libre.sql`.
 
+## Fase 4 (incluido)
+
+- **Ficha rápida al crear tarea**: nombre, responsables y fecha límite antes de crearla (botón «Nueva tarea» o «+ Agregar tarea» en cada columna); «Crear y ver detalle» abre la tarea completa.
+- **Adjuntos**: imágenes y documentos en cada tarea (botón, arrastrar o pegar captura con Ctrl+V), máximo 10 MB. Bucket privado `adjuntos` de Supabase Storage; solo miembros del espacio. La tarjeta muestra «📎 n».
+- **Celular**: menú ☰ deslizable, columnas que se deslizan con el dedo, tarea a pantalla completa y ficha rápida desde abajo.
+- **Tiempo real** (Supabase Realtime): tareas, fases y adjuntos se actualizan solos para todo el equipo; indicador «En vivo».
+- Base de datos: `supabase/migrations/0005_adjuntos_y_tiempo_real.sql`.
+
 ## Próximas fases
 
 3. Calendario, Gantt y panel · 4. Mapa del proyecto que se colorea por fases · 5. Acceso de clientes.

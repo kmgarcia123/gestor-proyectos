@@ -55,6 +55,8 @@ export interface Tarea {
   responsables: string[];
   fecha_inicio?: string | null;
   pasos?: Paso[];
+  /** Cantidad de archivos adjuntos (solo para mostrar en la tarjeta). */
+  adjuntos_total?: number;
   fecha_limite: string | null;
   posicion: number;
   creado_en: string;
@@ -63,6 +65,18 @@ export interface Tarea {
   recordar_en?: string | null;
   recordatorio_enviado_en?: string | null;
   mensaje_recordatorio?: string | null;
+}
+
+export interface Adjunto {
+  id: string;
+  tarea_id: string;
+  workspace_id: string;
+  nombre: string;
+  ruta: string;
+  tipo: string | null;
+  tamano: number | null;
+  subido_por: string | null;
+  creado_en: string;
 }
 
 export const ESTADOS: { id: Estado; nombre: string }[] = [

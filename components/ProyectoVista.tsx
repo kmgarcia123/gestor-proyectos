@@ -1,6 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { createClient } from '@/lib/supabase/client';
 import Tablero from '@/components/Tablero';
 import MapaFases from '@/components/MapaFases';
 import type { Fase, Perfil, Proyecto, Tarea } from '@/lib/types';
@@ -20,6 +22,47 @@ export default function ProyectoVista({ proyecto, tareasIniciales, fases, equipo
   const [vista, setVista] = useState<'tablero' | 'mapa'>(tareaAbiertaId ? 'tablero' : vistaInicial);
   const [tareas, setTareas] = useState<Tarea[]>(tareasIniciales);
   const [faseFiltro, setFaseFiltro] = useState('');
+  const [enVivo, setEnVivo] = useState(false);
+  const router = useRouter();
+
+  // Tiempo real: los cambios de los compañeros aparecen sin recargar la página.
+  useEffect(() => {
+    const supabase = createClient();
+    let refresco: ReturnType<typeof setTimeout> | undefined;
+    const refrescarPagina = () => {
+      clearTimeout(refresco);
+      refresco = setTimeout(() => router.refresh(), 400);
+    };
+    const contarAdjuntos = async () => {
+      const { data } = await supabase.from('adjuntos').select('tarea_id, tareas!inner(proyecto_id)').eq('tareas.proyecto_id', proyecto.id);
+      const conteo = new Map<string, number>();
+      (data || []).forEach((a) => conteo.set(a.tarea_id as string, (conteo.get(a.tarea_id as string) || 0) + 1));
+      setTareas((ts) => ts.map((t) => ({ ...t, adjuntos_total: conteo.get(t.id) || 0 })));
+    };
+    const canal = supabase
+      .channel(`proyecto-${proyecto.id}`)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tareas', filter: `proyecto_id=eq.${proyecto.id}` }, ({ new: n }) => {
+        const t = n as Tarea;
+        setTareas((ts) => (ts.some((x) => x.id === t.id) ? ts : [{ ...t, adjuntos_total: 0 }, ...ts]));
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tareas', filter: `proyecto_id=eq.${proyecto.id}` }, ({ new: n }) => {
+        const t = n as Tarea;
+        setTareas((ts) => ts.map((x) => (x.id === t.id ? { ...x, ...t, adjuntos_total: x.adjuntos_total } : x)));
+      })
+      // Los borrados no se pueden filtrar por proyecto: se quita la tarea si está en la lista.
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'tareas' }, ({ old: o }) => {
+        const id = (o as { id?: string }).id;
+        if (id) setTareas((ts) => ts.filter((x) => x.id !== id));
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'fases', filter: `proyecto_id=eq.${proyecto.id}` }, refrescarPagina)
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'fases' }, refrescarPagina)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'adjuntos' }, contarAdjuntos)
+      .subscribe((estado) => setEnVivo(estado === 'SUBSCRIBED'));
+    return () => {
+      clearTimeout(refresco);
+      supabase.removeChannel(canal);
+    };
+  }, [proyecto.id, router]);
 
   const pestaña = (id: 'tablero' | 'mapa', texto: string, icono: React.ReactNode) => (
     <button
@@ -39,6 +82,10 @@ export default function ProyectoVista({ proyecto, tareasIniciales, fases, equipo
       <div role="tablist" aria-label="Vistas del proyecto" className="flex gap-6 border-b border-slate-200 bg-white px-4 sm:px-8">
         {pestaña('tablero', 'Tablero', <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true"><rect x="3" y="4" width="5" height="16" rx="1.5" /><rect x="10" y="4" width="5" height="10" rx="1.5" /><rect x="17" y="4" width="4" height="13" rx="1.5" /></svg>)}
         {pestaña('mapa', `Mapa de fases${fases.length ? ` · ${fases.length}` : ''}`, <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="2" width="6" height="5" rx="1" /><rect x="2" y="17" width="6" height="5" rx="1" /><rect x="16" y="17" width="6" height="5" rx="1" /><path d="M12 7v5M5 17v-5h14v5" /></svg>)}
+        <span className={`ml-auto hidden items-center gap-1.5 self-center pb-2 text-xs font-semibold sm:flex ${enVivo ? 'text-turquesa-oscuro' : 'text-slate-400'}`} title={enVivo ? 'Los cambios del equipo aparecen al instante' : 'Conectando…'}>
+          <span className={`h-2 w-2 rounded-full ${enVivo ? 'animate-pulse bg-turquesa' : 'bg-slate-300'}`} aria-hidden="true" />
+          {enVivo ? 'En vivo' : 'Conectando…'}
+        </span>
       </div>
       {vista === 'tablero' ? (
         <Tablero

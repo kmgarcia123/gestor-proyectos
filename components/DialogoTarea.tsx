@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useTransition } from 'react';
 import { actualizarTarea, eliminarTarea, guardarPasos, recordarAhora, type CambiosTarea } from '@/app/(app)/actions';
 import ListaPasos from '@/components/ListaPasos';
+import Adjuntos from '@/components/Adjuntos';
 import SelectorResponsables from '@/components/SelectorResponsables';
 import { aplanar } from '@/lib/fases';
 import { ESTADOS, PRIORIDADES, type Fase, type Paso, type Perfil, type Tarea } from '@/lib/types';
@@ -13,6 +14,8 @@ interface Props {
   fases: Fase[];
   onCerrar: () => void;
   onGuardada: (t: Tarea) => void;
+  /** Cambios que se guardan al instante (pasos, adjuntos) sin cerrar la tarea. */
+  onParcial: (id: string, cambios: Partial<Tarea>) => void;
   onEliminada: (id: string) => void;
 }
 
@@ -24,7 +27,7 @@ function aLocal(iso: string | null | undefined) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
 }
 
-export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardada, onEliminada }: Props) {
+export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardada, onParcial, onEliminada }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const [form, setForm] = useState<Tarea | null>(tarea);
   const [pending, start] = useTransition();
@@ -91,10 +94,10 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
     if (!tarea || !form) return;
     const anterior = form.pasos || [];
     setForm({ ...form, pasos });
-    onGuardada({ ...tarea, pasos });
+    onParcial(tarea.id, { pasos });
     guardarPasos(tarea.id, pasos).catch(() => {
       setForm((f) => (f ? { ...f, pasos: anterior } : f));
-      onGuardada({ ...tarea, pasos: anterior });
+      onParcial(tarea.id, { pasos: anterior });
       setError('No se pudo guardar la lista de pasos. Revisa tu conexión.');
     });
   }
@@ -109,13 +112,13 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
   }
 
   return (
-    <dialog ref={ref} onClose={onCerrar} className="w-[min(620px,94vw)] rounded-3xl p-0 backdrop:bg-carbon/60 backdrop:backdrop-blur-sm" aria-labelledby="dt-titulo">
+    <dialog ref={ref} onClose={onCerrar} className="w-[min(620px,94vw)] rounded-3xl p-0 backdrop:bg-carbon/60 backdrop:backdrop-blur-sm max-sm:m-0 max-sm:h-full max-sm:max-h-full max-sm:w-full max-sm:max-w-full max-sm:rounded-none" aria-labelledby="dt-titulo">
       <form
         onSubmit={(e) => {
           e.preventDefault();
           guardar();
         }}
-        className="flex flex-col gap-4 p-6"
+        className="flex flex-col gap-4 p-5 sm:p-6"
       >
         <div className="flex items-start gap-3">
           <label htmlFor="dt-titulo" className="sr-only">Título</label>
@@ -159,6 +162,8 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
         </div>
 
         <ListaPasos key={tarea?.id} pasos={form.pasos || []} onCambio={cambiarPasos} />
+
+        {tarea && <Adjuntos key={tarea.id} tareaId={tarea.id} workspaceId={tarea.workspace_id} onTotal={(n) => onParcial(tarea.id, { adjuntos_total: n })} />}
 
         <div>
           <label className="etiqueta" htmlFor="dt-desc">Descripción</label>
