@@ -188,13 +188,6 @@ export async function ordenarMapa(proyectoId: string) {
   revalidatePath(`/proyectos/${proyectoId}`);
 }
 
-export async function eliminarFase(id: string) {
-  const { supabase } = await getContexto();
-  // Las subfases se eliminan en cascada; las tareas quedan "sin fase".
-  const { data } = await supabase.from('fases').delete().eq('id', id).select('proyecto_id').single();
-  if (data) revalidatePath(`/proyectos/${data.proyecto_id}`);
-}
-
 // ---------- Tareas ----------
 
 export interface NuevaTarea {
@@ -310,14 +303,89 @@ function avisarAsignacion(tareaId: string, nuevos: string[], quien: { nombre: st
   });
 }
 
-export async function eliminarTarea(id: string) {
+// ---------- Proyectos fijados ----------
+
+/** Fija o suelta un proyecto en la parte de arriba del menú (cada persona tiene los suyos). */
+export async function alternarFijado(proyectoId: string) {
+  const { supabase, user, fijados } = await getContexto();
+  const nuevos = fijados.includes(proyectoId) ? fijados.filter((id) => id !== proyectoId) : [...fijados, proyectoId];
+  const { error } = await supabase.from('perfiles').update({ proyectos_fijados: nuevos }).eq('id', user.id);
+  if (error) throw new Error(error.message);
+  revalidatePath('/', 'layout');
+}
+
+// ---------- Eliminar con aprobación de todo el equipo ----------
+
+export type TipoEliminacion = 'proyecto' | 'fase' | 'tarea';
+
+/** Archivos en Storage que hay que borrar si se aprueba la eliminación (se leen antes, porque luego ya no existen). */
+async function rutasAdjuntos(supabase: Awaited<ReturnType<typeof getContexto>>['supabase'], tipo: TipoEliminacion, id: string) {
+  if (tipo === 'tarea') {
+    const { data } = await supabase.from('adjuntos').select('ruta').eq('tarea_id', id);
+    return (data || []).map((a) => a.ruta as string);
+  }
+  if (tipo === 'proyecto') {
+    const { data } = await supabase.from('adjuntos').select('ruta, tareas!inner(proyecto_id)').eq('tareas.proyecto_id', id);
+    return (data || []).map((a) => a.ruta as string);
+  }
+  return [];
+}
+
+async function borrarArchivos(rutas: string[]) {
+  if (rutas.length) await createAdminClient().storage.from('adjuntos').remove(rutas);
+}
+
+const NOMBRE_TIPO: Record<TipoEliminacion, string> = { proyecto: 'el proyecto', fase: 'la fase', tarea: 'la tarea' };
+
+/** Pide eliminar un proyecto, fase o tarea. Se borra cuando todos lo aprueban. Avisa a los demás. */
+export async function solicitarEliminacion(tipo: TipoEliminacion, id: string): Promise<{ estado: string; texto: string }> {
+  const { supabase, yo, equipo } = await getContexto();
+  const rutas = await rutasAdjuntos(supabase, tipo, id);
+  const { data: solicitudId, error } = await supabase.rpc('solicitar_eliminacion', { p_tipo: tipo, p_objeto: id });
+  if (error) throw new Error(error.message);
+  const { data: sol } = await supabase.from('solicitudes_eliminacion').select('estado, nombre, proyecto_id').eq('id', solicitudId).single();
+  revalidatePath('/', 'layout');
+  if (sol?.estado === 'aprobada') {
+    await borrarArchivos(rutas);
+    return { estado: 'aprobada', texto: 'Eliminado.' };
+  }
+
+  const otros = equipo.filter((m) => m.id !== yo.id).map((m) => m.id);
+  const deParte = (yo.nombre || yo.email).split(' ')[0];
+  after(async () => {
+    if (!sol || !otros.length) return;
+    const { data: personas } = await createAdminClient().from('perfiles').select(CAMPOS_PERFIL).in('id', otros);
+    const enlace = SITIO() ? (sol.proyecto_id && tipo !== 'proyecto' ? `${SITIO()}/proyectos/${sol.proyecto_id}` : SITIO()) : undefined;
+    for (const p of (personas || []) as PerfilAvisos[]) {
+      const canales = canalesActivos(p);
+      if (!canales.length) continue;
+      await notificar(
+        p,
+        {
+          asunto: `${deParte} pide eliminar ${NOMBRE_TIPO[tipo]} «${sol.nombre}»`,
+          intro: `${deParte} pide eliminar ${NOMBRE_TIPO[tipo]}. Solo se borra si todo el equipo lo aprueba:`,
+          lineas: [{ etiqueta: 'Pendiente de tu aprobación', color: '#B42318', titulo: sol.nombre, detalle: tipo === 'proyecto' ? 'Proyecto completo, con sus fases y tareas' : undefined, enlace }],
+          enlace,
+          resumenWhatsApp: `${deParte} pide eliminar ${NOMBRE_TIPO[tipo]} «${sol.nombre}». Entra para aprobar o rechazar`
+        },
+        canales,
+        { tipo: 'solicitud', tareas: [] }
+      );
+    }
+  });
+  return { estado: 'pendiente', texto: `Solicitud enviada. Se elimina cuando lo aprueben los ${equipo.length}.` };
+}
+
+/** Aprobar o rechazar una eliminación. Si con este voto se completa, se borra (y sus archivos). */
+export async function votarEliminacion(solicitudId: string, aprueba: boolean): Promise<string> {
   const { supabase } = await getContexto();
-  // Borra también los archivos adjuntos guardados en Storage.
-  const { data: archivos } = await supabase.from('adjuntos').select('ruta').eq('tarea_id', id);
-  if (archivos?.length) await supabase.storage.from('adjuntos').remove(archivos.map((a) => a.ruta));
-  const { data } = await supabase.from('tareas').delete().eq('id', id).select('proyecto_id').single();
-  if (data) revalidatePath(`/proyectos/${data.proyecto_id}`);
-  revalidatePath('/');
+  const { data: sol } = await supabase.from('solicitudes_eliminacion').select('tipo, objeto_id').eq('id', solicitudId).single();
+  const rutas = sol && aprueba ? await rutasAdjuntos(supabase, sol.tipo as TipoEliminacion, sol.objeto_id as string) : [];
+  const { data, error } = await supabase.rpc('votar_eliminacion', { p_id: solicitudId, p_aprueba: aprueba });
+  if (error) throw new Error(error.message);
+  if (data === 'aprobada') await borrarArchivos(rutas);
+  revalidatePath('/', 'layout');
+  return data as string;
 }
 
 /** Envía ya mismo un recordatorio de la tarea a sus responsables (menos a quien lo envía), por los canales de cada uno. */

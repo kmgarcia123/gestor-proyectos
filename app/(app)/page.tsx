@@ -2,6 +2,7 @@ import Link from 'next/link';
 import Avatar from '@/components/Avatar';
 import NuevoProyecto from '@/components/NuevoProyecto';
 import SolicitudNombre, { type Solicitud } from '@/components/SolicitudNombre';
+import SolicitudEliminacion, { type PendienteEliminar } from '@/components/SolicitudEliminacion';
 import { getContexto } from '@/lib/datos';
 import { nombreCorto } from '@/lib/perfil';
 import { estadoFecha, formatoCorto, hoyBogota } from '@/lib/fechas';
@@ -16,7 +17,7 @@ const ETQ_FECHA: Record<string, { txt: string; cls: string }> = {
 };
 
 export default async function Inicio() {
-  const { supabase, yo, workspaceId, proyectos, equipo } = await getContexto();
+  const { supabase, yo, workspaceId, proyectos, equipo, fijados } = await getContexto();
   const { data } = await supabase
     .from('tareas')
     .select('id, proyecto_id, titulo, estado, prioridad, responsables, fecha_limite, terminado_en')
@@ -26,6 +27,12 @@ export default async function Inicio() {
     .select('id, proyecto_id, nombre_actual, nombre_nuevo, solicitado_por, aprobaciones')
     .eq('workspace_id', workspaceId)
     .eq('estado', 'pendiente');
+  const { data: eliminaciones } = await supabase
+    .from('solicitudes_eliminacion')
+    .select('id, tipo, objeto_id, nombre, proyecto_id, solicitado_por, aprobaciones')
+    .eq('workspace_id', workspaceId)
+    .eq('estado', 'pendiente')
+    .order('creado_en');
   const tareas = (data || []) as Pick<Tarea, 'id' | 'proyecto_id' | 'titulo' | 'estado' | 'prioridad' | 'responsables' | 'fecha_limite' | 'terminado_en'>[];
 
   const hoy = hoyBogota();
@@ -37,7 +44,8 @@ export default async function Inicio() {
   const proximas = [...mias].sort((a, b) => (a.fecha_limite || '9999').localeCompare(b.fecha_limite || '9999')).slice(0, 8);
   const proyectoPorId = Object.fromEntries(proyectos.map((p) => [p.id, p]));
 
-  const avance = proyectos.map((p) => {
+  const ordenados = [...proyectos].sort((a, b) => (fijados.includes(b.id) ? 1 : 0) - (fijados.includes(a.id) ? 1 : 0) || fijados.indexOf(a.id) - fijados.indexOf(b.id));
+  const avance = ordenados.map((p) => {
     const ts = tareas.filter((t) => t.proyecto_id === p.id);
     const hechas = ts.filter((t) => t.estado === 'hecho').length;
     return { p, total: ts.length, hechas, pct: ts.length ? Math.round((hechas / ts.length) * 100) : 0 };
@@ -66,10 +74,19 @@ export default async function Inicio() {
         <NuevoProyecto />
       </header>
 
-      {(solicitudes || []).length > 0 && (
+      {((solicitudes || []).length > 0 || (eliminaciones || []).length > 0) && (
         <section aria-label="Solicitudes pendientes" className="mb-6 flex flex-col gap-3">
           {(solicitudes as Solicitud[]).map((sol) => (
             <SolicitudNombre key={sol.id} s={sol} equipo={equipo} yoId={yo.id} compacto />
+          ))}
+          {((eliminaciones || []) as PendienteEliminar[]).map((sol) => (
+            <SolicitudEliminacion
+              key={sol.id}
+              s={sol}
+              equipo={equipo}
+              yoId={yo.id}
+              detalle={sol.tipo !== 'proyecto' && sol.proyecto_id ? `en ${proyectos.find((p) => p.id === sol.proyecto_id)?.nombre || 'un proyecto'}` : sol.tipo === 'proyecto' ? 'con todas sus fases y tareas' : undefined}
+            />
           ))}
         </section>
       )}
@@ -141,6 +158,7 @@ export default async function Inicio() {
                 <div className="flex items-center gap-2">
                   <span className="h-3 w-3 rounded-full" style={{ background: p.color }} aria-hidden="true" />
                   <h3 className="truncate font-bold group-hover:text-azul">{p.nombre}</h3>
+                  {fijados.includes(p.id) && <span className="ml-auto text-xs" title="Fijado" aria-label="Fijado">📌</span>}
                 </div>
                 <div className="flex items-end justify-between">
                   <span className="text-3xl font-extrabold tracking-tight">{pct}%</span>

@@ -7,6 +7,7 @@ import { prepararTiempoReal } from '@/lib/en-vivo';
 import Tablero from '@/components/Tablero';
 import MapaFases from '@/components/MapaFases';
 import type { Fase, Perfil, Proyecto, Tarea } from '@/lib/types';
+import type { PendienteEliminar } from '@/components/SolicitudEliminacion';
 
 interface Props {
   proyecto: Proyecto;
@@ -16,10 +17,11 @@ interface Props {
   yoId: string;
   tareaAbiertaId?: string;
   vistaInicial?: 'tablero' | 'mapa';
+  eliminaciones?: PendienteEliminar[];
 }
 
 /** Pestañas del proyecto: Tablero y Mapa de fases (comparten las mismas tareas). */
-export default function ProyectoVista({ proyecto, tareasIniciales, fases, equipo, yoId, tareaAbiertaId, vistaInicial = 'tablero' }: Props) {
+export default function ProyectoVista({ proyecto, tareasIniciales, fases, equipo, yoId, tareaAbiertaId, vistaInicial = 'tablero', eliminaciones = [] }: Props) {
   const [vista, setVista] = useState<'tablero' | 'mapa'>(tareaAbiertaId ? 'tablero' : vistaInicial);
   const [tareas, setTareas] = useState<Tarea[]>(tareasIniciales);
   const [faseFiltro, setFaseFiltro] = useState('');
@@ -71,6 +73,7 @@ export default function ProyectoVista({ proyecto, tareasIniciales, fases, equipo
         .on('postgres_changes', { event: '*', schema: 'public', table: 'adjuntos' }, () => sincronizar())
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'proyectos', filter: `id=eq.${proyecto.id}` }, refrescarPagina)
         .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes_nombre', filter: `proyecto_id=eq.${proyecto.id}` }, refrescarPagina)
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'solicitudes_eliminacion', filter: `proyecto_id=eq.${proyecto.id}` }, refrescarPagina)
         .subscribe((estado) => {
           conectado = estado === 'SUBSCRIBED';
           if (activo) setEnVivo(conectado);
@@ -145,12 +148,15 @@ export default function ProyectoVista({ proyecto, tareasIniciales, fases, equipo
           setFaseFiltro={setFaseFiltro}
           tareaAbiertaId={tareaAbiertaId}
           yoId={yoId}
+          eliminaciones={eliminaciones}
         />
       ) : (
         <MapaFases
           proyecto={proyecto}
           fases={fases}
           tareas={tareas}
+          equipo={equipo}
+          eliminaciones={eliminaciones}
           onVerTareas={(id) => {
             setFaseFiltro(id);
             setVista('tablero');

@@ -60,7 +60,7 @@ export function ContenidoTarjeta({ t, responsables, fase }: { t: Tarea; responsa
   );
 }
 
-export default function TarjetaTarea({ t, responsables, fase, onAbrir }: { t: Tarea; responsables: Perfil[]; fase?: Fase; onAbrir: () => void }) {
+export default function TarjetaTarea({ t, responsables, fase, onAbrir, eliminando = false }: { t: Tarea; responsables: Perfil[]; fase?: Fase; onAbrir: () => void; eliminando?: boolean }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: t.id, data: { tipo: 'tarea', estado: t.estado } });
   return (
     <li
@@ -76,6 +76,7 @@ export default function TarjetaTarea({ t, responsables, fase, onAbrir }: { t: Ta
         className="block w-full cursor-grab rounded-2xl border border-slate-200/70 bg-white p-3.5 text-left shadow-sm transition hover:border-azul/40 hover:shadow-md active:cursor-grabbing"
         aria-label={`Tarea: ${t.titulo}. Clic para abrir, arrastrar para mover.`}
       >
+        {eliminando && <p className="mb-1.5 inline-flex rounded-full bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">Eliminación pendiente</p>}
         <ContenidoTarjeta t={t} responsables={responsables} fase={fase} />
       </button>
     </li>

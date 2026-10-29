@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { actualizarTarea, eliminarTarea, guardarPasos, recordarAhora, type CambiosTarea } from '@/app/(app)/actions';
+import { actualizarTarea, guardarPasos, recordarAhora, solicitarEliminacion, type CambiosTarea } from '@/app/(app)/actions';
+import type { PendienteEliminar } from '@/components/SolicitudEliminacion';
 import ListaPasos from '@/components/ListaPasos';
 import Adjuntos from '@/components/Adjuntos';
 import EditorTexto from '@/components/EditorTexto';
@@ -19,6 +20,8 @@ interface Props {
   /** Cambios que se guardan al instante (pasos, adjuntos) sin cerrar la tarea. */
   onParcial: (id: string, cambios: Partial<Tarea>) => void;
   onEliminada: (id: string) => void;
+  /** Si ya hay una solicitud para eliminar esta tarea. */
+  eliminacion?: PendienteEliminar;
 }
 
 /** ISO (UTC) → valor para <input type="datetime-local"> en la hora del navegador. */
@@ -29,7 +32,7 @@ function aLocal(iso: string | null | undefined) {
   return new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 16);
 }
 
-export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardada, onParcial, onEliminada }: Props) {
+export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardada, onParcial, onEliminada, eliminacion }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
   const [form, setForm] = useState<Tarea | null>(tarea);
   const [pending, start] = useTransition();
@@ -111,9 +114,18 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
     // Lo que no tiene vuelta atrás pide un segundo toque que dice exactamente qué va a pasar.
     if (!confirmarBorrado) return setConfirmarBorrado(true);
     start(async () => {
-      await eliminarTarea(tarea.id);
-      onEliminada(tarea.id);
-      ref.current?.close();
+      try {
+        const r = await solicitarEliminacion('tarea', tarea.id);
+        setConfirmarBorrado(false);
+        if (r.estado === 'aprobada') {
+          onEliminada(tarea.id);
+          ref.current?.close();
+        } else {
+          setAviso({ ok: true, texto: r.texto });
+        }
+      } catch {
+        setError('No se pudo enviar la solicitud. Intenta de nuevo.');
+      }
     });
   }
 
@@ -251,11 +263,13 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
         {confirmarBorrado ? (
           <div className="flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4" role="alertdialog" aria-label="Confirmar eliminación">
             <p className="text-sm text-red-800">
-              Se elimina «{form.titulo}»{(tarea?.adjuntos_total || 0) > 0 ? ' con sus archivos adjuntos' : ''}. Esto no se puede deshacer.
+              {equipo.length > 1
+                ? `Se pide eliminar «${form.titulo}»${(tarea?.adjuntos_total || 0) > 0 ? ' con sus archivos adjuntos' : ''}. Solo se borra cuando lo aprueben los ${equipo.length} del equipo; les llega un aviso.`
+                : `Se elimina «${form.titulo}»${(tarea?.adjuntos_total || 0) > 0 ? ' con sus archivos adjuntos' : ''}. Esto no se puede deshacer.`}
             </p>
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" onClick={borrar} disabled={pending} className="btn-destructivo bg-white">
-                {pending ? 'Eliminando…' : 'Eliminar tarea definitivamente'}
+                {pending ? 'Enviando…' : equipo.length > 1 ? 'Pedir eliminación' : 'Eliminar tarea definitivamente'}
               </button>
               <button type="button" onClick={() => setConfirmarBorrado(false)} className="btn-ghost">Conservar tarea</button>
             </div>
@@ -265,7 +279,13 @@ export default function DialogoTarea({ tarea, equipo, fases, onCerrar, onGuardad
             <button type="submit" disabled={pending} className="btn-primario">{pending ? 'Guardando…' : 'Guardar cambios'}</button>
             <button type="button" onClick={() => ref.current?.close()} className="btn-ghost">Cerrar sin guardar</button>
             <div className="separador-destructivo">
-              <button type="button" onClick={borrar} disabled={pending} className="btn-destructivo">Eliminar tarea</button>
+              {eliminacion ? (
+                <span className="text-xs font-semibold text-red-700" title="Se vota en el aviso rojo del proyecto o en Inicio">
+                  Eliminación pendiente · {eliminacion.aprobaciones.length}/{equipo.length}
+                </span>
+              ) : (
+                <button type="button" onClick={borrar} disabled={pending} className="btn-destructivo">Eliminar tarea</button>
+              )}
             </div>
           </div>
         )}

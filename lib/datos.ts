@@ -24,9 +24,10 @@ export const getContexto = cache(async () => {
   const workspaceId = membresia.workspace_id as string;
   const ws = membresia.workspaces as unknown as { nombre: string } | null;
 
-  const [{ data: miembros }, { data: proyectos }] = await Promise.all([
+  const [{ data: miembros }, { data: proyectos }, { data: mio }] = await Promise.all([
     supabase.from('miembros').select('perfiles(id, email, nombre, avatar_url)').eq('workspace_id', workspaceId),
-    supabase.from('proyectos').select('*').eq('workspace_id', workspaceId).eq('archivado', false).order('creado_en')
+    supabase.from('proyectos').select('*').eq('workspace_id', workspaceId).eq('archivado', false).order('creado_en'),
+    supabase.from('perfiles').select('proyectos_fijados').eq('id', user.id).maybeSingle()
   ]);
 
   const equipo = (miembros || []).map((m) => m.perfiles as unknown as Perfil).filter(Boolean);
@@ -40,7 +41,9 @@ export const getContexto = cache(async () => {
     workspaceId,
     workspaceNombre: ws?.nombre || 'Mi espacio',
     equipo,
-    proyectos: (proyectos || []) as Proyecto[]
+    proyectos: (proyectos || []) as Proyecto[],
+    /** Proyectos que esta persona fijó arriba (en orden). */
+    fijados: ((mio?.proyectos_fijados as string[] | undefined) || []).filter((id) => (proyectos || []).some((p) => p.id === id))
   };
 });
 

@@ -21,6 +21,7 @@ import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrate
 import TarjetaTarea, { ContenidoTarjeta } from '@/components/TarjetaTarea';
 import DialogoTarea from '@/components/DialogoTarea';
 import NuevaTareaRapida, { type DatosNuevaTarea } from '@/components/NuevaTareaRapida';
+import type { PendienteEliminar } from '@/components/SolicitudEliminacion';
 import { actualizarTarea, crearTarea } from '@/app/(app)/actions';
 import { ESTADOS, type Estado, type Fase, type Perfil, type Tarea } from '@/lib/types';
 import { ESTILO_ESTADO, IconoEstado } from '@/components/Iconos';
@@ -36,6 +37,7 @@ interface Props {
   setFaseFiltro: (id: string) => void;
   tareaAbiertaId?: string;
   yoId: string;
+  eliminaciones?: PendienteEliminar[];
 }
 
 function Columna({ estado, nombre, children, total, arriba }: { estado: Estado; nombre: string; children: React.ReactNode; total: number; arriba: React.ReactNode }) {
@@ -76,7 +78,8 @@ function AgregarRapido({ onAgregar, id }: { onAgregar: (titulo: string) => void;
   );
 }
 
-export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, faseFiltro, setFaseFiltro, tareaAbiertaId, yoId }: Props) {
+export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, faseFiltro, setFaseFiltro, tareaAbiertaId, yoId, eliminaciones = [] }: Props) {
+  const porEliminar = new Map(eliminaciones.filter((e) => e.tipo === 'tarea').map((e) => [e.objeto_id, e]));
   const [abierta, setAbierta] = useState<Tarea | null>(() => tareas.find((t) => t.id === tareaAbiertaId) || null);
   const [arrastrando, setArrastrando] = useState<Tarea | null>(null);
   const [soloMias, setSoloMias] = useState(false);
@@ -179,7 +182,7 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
               <SortableContext items={c.tareas.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 <ul className="flex flex-col gap-2.5">
                   {c.tareas.map((t) => (
-                    <TarjetaTarea key={t.id} t={t} responsables={personas(t)} fase={t.fase_id ? fasePorId[t.fase_id] : undefined} onAbrir={() => setAbierta(t)} />
+                    <TarjetaTarea key={t.id} t={t} eliminando={porEliminar.has(t.id)} responsables={personas(t)} fase={t.fase_id ? fasePorId[t.fase_id] : undefined} onAbrir={() => setAbierta(t)} />
                   ))}
                 </ul>
               </SortableContext>
@@ -213,6 +216,7 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
         onGuardada={(t) => setTareas((ts) => ts.map((x) => (x.id === t.id ? { ...x, ...t, pasos: x.pasos, adjuntos_total: x.adjuntos_total, actualizado_en: new Date().toISOString(), actualizado_por: yoId } : x)))}
         onParcial={(id, c) => setTareas((ts) => ts.map((x) => (x.id === id ? { ...x, ...c } : x)))}
         onEliminada={(id) => setTareas((ts) => ts.filter((x) => x.id !== id))}
+        eliminacion={abierta ? porEliminar.get(abierta.id) : undefined}
       />
     </div>
   );

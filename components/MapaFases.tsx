@@ -1,9 +1,10 @@
 'use client';
 
 import { useEffect, useRef, useState, useTransition } from 'react';
-import { actualizarFase, crearFase, eliminarFase, guardarPosiciones, guardarPosicionProyecto, intercambiarFases, ordenarMapa } from '@/app/(app)/actions';
+import { actualizarFase, crearFase, solicitarEliminacion, guardarPosiciones, guardarPosicionProyecto, intercambiarFases, ordenarMapa } from '@/app/(app)/actions';
 import { aplanar, avanceFase, conDescendientes, hijosPorPadre } from '@/lib/fases';
-import type { EstadoFase, Fase, Proyecto, Tarea } from '@/lib/types';
+import type { EstadoFase, Fase, Perfil, Proyecto, Tarea } from '@/lib/types';
+import type { PendienteEliminar } from '@/components/SolicitudEliminacion';
 
 const ESTILO: Record<EstadoFase, { caja: string; barra: string; chip: string; texto: string }> = {
   hecho: { caja: 'border-turquesa bg-turquesa-suave', barra: 'bg-turquesa', chip: 'bg-turquesa text-white', texto: 'Ejecutada' },
@@ -17,6 +18,8 @@ interface Props {
   proyecto: Proyecto;
   fases: Fase[];
   tareas: Tarea[];
+  equipo: Perfil[];
+  eliminaciones?: PendienteEliminar[];
   onVerTareas: (faseId: string) => void;
 }
 
@@ -58,7 +61,8 @@ function layoutAutomatico(fases: Fase[]) {
   return { pos, raiz: { x: MARGEN + ancho / 2 - RAIZ_W / 2, y: MARGEN } };
 }
 
-export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Props) {
+export default function MapaFases({ proyecto, fases, tareas, equipo, eliminaciones = [], onVerTareas }: Props) {
+  const porEliminar = new Map(eliminaciones.filter((e) => e.tipo === 'fase').map((e) => [e.objeto_id, e]));
   const [editor, setEditor] = useState<Editor>(null);
   const [pending, start] = useTransition();
   const lienzo = useRef<HTMLDivElement>(null);
@@ -205,6 +209,7 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
     const i = hermanos.findIndex((x) => x.id === f.id);
     const p = posiciones.get(f.id)!;
     const moviendo = temporal.has(f.id);
+    const pendienteBorrar = porEliminar.get(f.id);
     return (
       <div
         key={f.id}
@@ -223,7 +228,7 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
       >
         <div className="flex items-start justify-between gap-2">
           <p className="line-clamp-2 min-w-0 break-words text-sm font-bold leading-snug">{f.nombre}</p>
-          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${st.chip}`}>{st.texto}</span>
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold ${pendienteBorrar ? 'bg-red-600 text-white' : st.chip}`}>{pendienteBorrar ? 'Por eliminar' : st.texto}</span>
         </div>
         <div className="mt-auto">
           <div className="flex items-center gap-2">
@@ -320,12 +325,13 @@ export default function MapaFases({ proyecto, fases, tareas, onVerTareas }: Prop
         </div>
       </div>
 
-      <EditorFase editor={editor} fases={fases} proyectoId={proyecto.id} onCerrar={() => setEditor(null)} />
+      <EditorFase editor={editor} fases={fases} proyectoId={proyecto.id} totalEquipo={equipo.length} pendiente={editor?.modo === 'editar' ? porEliminar.get(editor.fase.id) : undefined} onCerrar={() => setEditor(null)} />
     </div>
   );
 }
 
-function EditorFase({ editor, fases, proyectoId, onCerrar }: { editor: Editor; fases: Fase[]; proyectoId: string; onCerrar: () => void }) {
+function EditorFase({ editor, fases, proyectoId, totalEquipo, pendiente, onCerrar }: { editor: Editor; fases: Fase[]; proyectoId: string; totalEquipo: number; pendiente?: PendienteEliminar; onCerrar: () => void }) {
+  const [avisoBorrado, setAvisoBorrado] = useState('');
   const ref = useRef<HTMLDialogElement>(null);
   const [nombre, setNombre] = useState('');
   const [padre, setPadre] = useState('');
@@ -371,7 +377,12 @@ function EditorFase({ editor, fases, proyectoId, onCerrar }: { editor: Editor; f
     if (editor?.modo !== 'editar') return;
     if (!confirmar) return setConfirmar(true);
     start(async () => {
-      await eliminarFase(editor.fase.id);
+      const r = await solicitarEliminacion('fase', editor.fase.id);
+      if (r.estado !== 'aprobada') {
+        setConfirmar(false);
+        setAvisoBorrado(r.texto);
+        return;
+      }
       ref.current?.close();
     });
   }
@@ -416,14 +427,16 @@ function EditorFase({ editor, fases, proyectoId, onCerrar }: { editor: Editor; f
             </div>
           )}
           {error && <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-700">{error}</p>}
+          {avisoBorrado && <p role="status" className="rounded-xl bg-amber-50 px-3 py-2 text-sm font-medium text-amber-800">{avisoBorrado}</p>}
           {confirmar && editor.modo === 'editar' ? (
             <div className="flex flex-col gap-3 rounded-2xl border border-red-200 bg-red-50 p-4" role="alertdialog" aria-label="Confirmar eliminación">
               <p className="text-sm text-red-800">
-                Se elimina «{editor.fase.nombre}»{sub ? ` y ${sub} subfase${sub > 1 ? 's' : ''}` : ''}. Sus tareas no se borran: quedan «sin fase».
+                {totalEquipo > 1 ? 'Se pide eliminar' : 'Se elimina'} «{editor.fase.nombre}»{sub ? ` y ${sub} subfase${sub > 1 ? 's' : ''}` : ''}. Sus tareas no se borran: quedan «sin fase».
+                {totalEquipo > 1 ? ` Solo se borra cuando lo aprueben los ${totalEquipo} del equipo.` : ''}
               </p>
               <div className="flex flex-wrap items-center gap-2">
                 <button type="button" onClick={borrar} disabled={pending} className="btn-destructivo bg-white">
-                  {pending ? 'Eliminando…' : sub ? `Eliminar fase y ${sub} subfase${sub > 1 ? 's' : ''}` : 'Eliminar fase definitivamente'}
+                  {pending ? 'Enviando…' : totalEquipo > 1 ? 'Pedir eliminación' : sub ? `Eliminar fase y ${sub} subfase${sub > 1 ? 's' : ''}` : 'Eliminar fase definitivamente'}
                 </button>
                 <button type="button" onClick={() => setConfirmar(false)} className="btn-ghost">Conservar fase</button>
               </div>
@@ -434,7 +447,11 @@ function EditorFase({ editor, fases, proyectoId, onCerrar }: { editor: Editor; f
               <button type="button" onClick={() => ref.current?.close()} className="btn-ghost">{editor.modo === 'editar' ? 'Cerrar sin guardar' : 'Cerrar sin crear'}</button>
               {editor.modo === 'editar' && (
                 <div className="separador-destructivo">
-                  <button type="button" onClick={borrar} disabled={pending} className="btn-destructivo">Eliminar fase</button>
+                  {pendiente ? (
+                    <span className="text-xs font-semibold text-red-700">Eliminación pendiente · {pendiente.aprobaciones.length}/{totalEquipo}</span>
+                  ) : (
+                    <button type="button" onClick={borrar} disabled={pending} className="btn-destructivo">Eliminar fase</button>
+                  )}
                 </div>
               )}
             </div>
