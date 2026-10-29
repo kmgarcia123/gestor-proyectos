@@ -16,6 +16,7 @@ import {
 import { SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import TarjetaTarea, { ContenidoTarjeta } from '@/components/TarjetaTarea';
 import DialogoTarea from '@/components/DialogoTarea';
+import NuevaTareaRapida, { type DatosNuevaTarea } from '@/components/NuevaTareaRapida';
 import { actualizarTarea, crearTarea } from '@/app/(app)/actions';
 import { ESTADOS, type Estado, type Fase, type Perfil, type Tarea } from '@/lib/types';
 import { aplanar, conDescendientes } from '@/lib/fases';
@@ -42,7 +43,7 @@ interface Props {
 function Columna({ estado, nombre, children, total, arriba }: { estado: Estado; nombre: string; children: React.ReactNode; total: number; arriba: React.ReactNode }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col:${estado}`, data: { tipo: 'columna', estado } });
   return (
-    <section aria-label={nombre} className={`flex w-[290px] shrink-0 flex-col rounded-3xl p-3 transition-colors sm:w-auto sm:min-w-0 ${isOver ? 'bg-azul-suave' : 'bg-nube'}`}>
+    <section aria-label={nombre} className={`flex w-[82vw] max-w-[320px] shrink-0 snap-center flex-col rounded-3xl p-3 transition-colors sm:w-auto sm:max-w-none sm:min-w-0 ${isOver ? 'bg-azul-suave' : 'bg-nube'}`}>
       <h2 className="mb-3 flex items-center gap-2 px-1 text-sm font-bold">
         <span className={`h-2.5 w-2.5 rounded-full ${COLOR_COL[estado]}`} aria-hidden="true" />
         {nombre}
@@ -56,27 +57,22 @@ function Columna({ estado, nombre, children, total, arriba }: { estado: Estado; 
   );
 }
 
-function AgregarRapido({ onAgregar, id }: { onAgregar: (titulo: string) => Promise<void>; id: string }) {
+function AgregarRapido({ onAgregar, id }: { onAgregar: (titulo: string) => void; id: string }) {
   const [valor, setValor] = useState('');
-  const [pending, start] = useTransition();
   return (
     <form
       onSubmit={(e) => {
         e.preventDefault();
-        const t = valor.trim();
-        if (!t) return;
-        start(async () => {
-          await onAgregar(t);
-          setValor('');
-        });
+        onAgregar(valor.trim());
+        setValor('');
       }}
       className="mb-2.5"
     >
       <label className="sr-only" htmlFor={id}>Nueva tarea</label>
       <div className="flex items-center gap-1 rounded-xl border border-dashed border-slate-300 bg-white/60 pr-1 transition focus-within:border-azul focus-within:bg-white hover:bg-white">
-        <span className="pl-3 text-lg font-bold leading-none text-azul" aria-hidden="true">+</span>
-        <input id={id} value={valor} onChange={(e) => setValor(e.target.value)} disabled={pending} placeholder="Agregar tarea" className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-0" />
-        {valor.trim() && <button type="submit" disabled={pending} className="rounded-lg bg-azul px-2.5 py-1 text-xs font-bold text-white">{pending ? '…' : 'Crear'}</button>}
+        <button type="submit" className="pl-3 text-lg font-bold leading-none text-azul" aria-label="Crear tarea">+</button>
+        <input id={id} value={valor} onChange={(e) => setValor(e.target.value)} placeholder="Agregar tarea" className="min-w-0 flex-1 border-0 bg-transparent px-2 py-2 text-sm placeholder:text-slate-500 focus:outline-none focus:ring-0" />
+        {valor.trim() && <button type="submit" className="rounded-lg bg-azul px-2.5 py-1 text-xs font-bold text-white">Crear</button>}
       </div>
     </form>
   );
@@ -86,6 +82,7 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
   const [abierta, setAbierta] = useState<Tarea | null>(() => tareas.find((t) => t.id === tareaAbiertaId) || null);
   const [arrastrando, setArrastrando] = useState<Tarea | null>(null);
   const [soloMias, setSoloMias] = useState(false);
+  const [nueva, setNueva] = useState<{ estado: Estado; titulo: string } | null>(null);
 
   const porId = useMemo(() => Object.fromEntries(equipo.map((m) => [m.id, m])), [equipo]);
   const fasePorId = useMemo(() => Object.fromEntries(fases.map((f) => [f.id, f])), [fases]);
@@ -131,11 +128,13 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
     actualizarTarea(activa.id, { estado: destino, posicion }).catch(() => setTareas(anterior));
   }
 
-  async function agregar(estado: Estado, titulo: string) {
+  async function agregar(estado: Estado, datos: DatosNuevaTarea, abrir: boolean) {
     // Queda de primera en la columna.
     const min = Math.min(0, ...tareas.filter((t) => t.estado === estado).map((t) => t.posicion));
-    const nueva = await crearTarea({ proyecto_id: proyectoId, titulo, estado, posicion: min - 1024, fase_id: faseFiltro || null });
-    if (nueva) setTareas((ts) => [nueva as Tarea, ...ts]);
+    const creada = (await crearTarea({ proyecto_id: proyectoId, titulo: datos.titulo, responsables: datos.responsables, fecha_limite: datos.fecha_limite, estado, posicion: min - 1024, fase_id: faseFiltro || null })) as Tarea | null;
+    if (!creada) return;
+    setTareas((ts) => (ts.some((t) => t.id === creada.id) ? ts : [{ ...creada, adjuntos_total: 0 }, ...ts]));
+    if (abrir) setTimeout(() => setAbierta({ ...creada, adjuntos_total: 0 }), 50);
   }
 
   return (
@@ -145,6 +144,10 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
           <button type="button" aria-pressed={!soloMias} onClick={() => setSoloMias(false)} className="rounded-full px-4 py-1.5 text-sm font-semibold text-slate-500 aria-pressed:bg-carbon aria-pressed:text-white">Todas</button>
           <button type="button" aria-pressed={soloMias} onClick={() => setSoloMias(true)} className="rounded-full px-4 py-1.5 text-sm font-semibold text-slate-500 aria-pressed:bg-carbon aria-pressed:text-white">Mis tareas</button>
         </div>
+        <button type="button" onClick={() => setNueva({ estado: 'por_hacer', titulo: '' })} className="btn-primario order-first sm:order-none">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14" /></svg>
+          Nueva tarea
+        </button>
         {fases.length > 0 && (
           <div>
             <label className="sr-only" htmlFor="filtro-fase">Filtrar por fase</label>
@@ -156,10 +159,10 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
         )}
       </div>
 
-      <DndContext sensors={sensors} collisionDetection={closestCorners} onDragStart={alIniciar} onDragEnd={alSoltar} onDragCancel={() => setArrastrando(null)}>
-        <div className="flex flex-1 gap-4 overflow-x-auto pb-4 sm:grid sm:grid-cols-2 sm:overflow-visible xl:grid-cols-4">
+      <DndContext id="tablero" sensors={sensors} collisionDetection={closestCorners} onDragStart={alIniciar} onDragEnd={alSoltar} onDragCancel={() => setArrastrando(null)}>
+        <div className="-mx-4 flex flex-1 snap-x snap-mandatory gap-3 overflow-x-auto px-4 pb-4 sm:mx-0 sm:grid sm:snap-none sm:grid-cols-2 sm:gap-4 sm:overflow-visible sm:px-0 xl:grid-cols-4">
           {columnas.map((c) => (
-            <Columna key={c.id} estado={c.id} nombre={c.nombre} total={c.tareas.length} arriba={<AgregarRapido id={`nueva-${c.id}`} onAgregar={(titulo) => agregar(c.id, titulo)} />}>
+            <Columna key={c.id} estado={c.id} nombre={c.nombre} total={c.tareas.length} arriba={<AgregarRapido id={`nueva-${c.id}`} onAgregar={(titulo) => setNueva({ estado: c.id, titulo })} />}>
               <SortableContext items={c.tareas.map((t) => t.id)} strategy={verticalListSortingStrategy}>
                 <ul className="flex flex-col gap-2.5">
                   {c.tareas.map((t) => (
@@ -179,12 +182,22 @@ export default function Tablero({ proyectoId, tareas, setTareas, equipo, fases, 
         </DragOverlay>
       </DndContext>
 
+      <NuevaTareaRapida
+        abierta={nueva}
+        equipo={equipo}
+        yoId={yoId}
+        faseNombre={faseFiltro ? fasePorId[faseFiltro]?.nombre : undefined}
+        onCerrar={() => setNueva(null)}
+        onCrear={(datos, abrir) => agregar(nueva!.estado, datos, abrir)}
+      />
+
       <DialogoTarea
         tarea={abierta}
         equipo={equipo}
         fases={fases}
         onCerrar={() => setAbierta(null)}
-        onGuardada={(t) => setTareas((ts) => ts.map((x) => (x.id === t.id ? t : x)))}
+        onGuardada={(t) => setTareas((ts) => ts.map((x) => (x.id === t.id ? { ...x, ...t, pasos: x.pasos, adjuntos_total: x.adjuntos_total } : x)))}
+        onParcial={(id, c) => setTareas((ts) => ts.map((x) => (x.id === id ? { ...x, ...c } : x)))}
         onEliminada={(id) => setTareas((ts) => ts.filter((x) => x.id !== id))}
       />
     </div>

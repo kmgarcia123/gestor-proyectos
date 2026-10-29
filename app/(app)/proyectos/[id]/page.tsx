@@ -16,9 +16,10 @@ export default async function ProyectoPage({ params, searchParams }: { params: P
 
   const [{ data: fases }, { data: tareas }] = await Promise.all([
     supabase.from('fases').select('*').eq('proyecto_id', id).order('posicion'),
-    supabase.from('tareas').select('*').eq('proyecto_id', id).order('posicion')
+    supabase.from('tareas').select('*, adjuntos(count)').eq('proyecto_id', id).order('posicion')
   ]);
-  const ts = (tareas || []) as Tarea[];
+  // adjuntos(count) llega como [{ count: n }]; se deja como número.
+  const ts = ((tareas || []) as (Tarea & { adjuntos?: { count: number }[] })[]).map(({ adjuntos, ...t }) => ({ ...t, adjuntos_total: adjuntos?.[0]?.count ?? 0 })) as Tarea[];
   const hechas = ts.filter((t) => t.estado === 'hecho').length;
   const pct = ts.length ? Math.round((hechas / ts.length) * 100) : 0;
 
@@ -33,13 +34,13 @@ export default async function ProyectoPage({ params, searchParams }: { params: P
             </div>
             {proyecto.descripcion && <p className="mt-1 max-w-2xl text-sm text-slate-500">{proyecto.descripcion}</p>}
           </div>
-          <div className="flex items-center gap-5">
+          <div className="flex w-full items-center gap-5 sm:w-auto">
             <div className="flex -space-x-2">
               {equipo.map((m) => (
                 <Avatar key={m.id} perfil={m} size={32} />
               ))}
             </div>
-            <div className="w-44">
+            <div className="min-w-0 flex-1 sm:w-44 sm:flex-none">
               <div className="mb-1 flex justify-between text-xs font-semibold">
                 <span className="text-slate-500">Avance</span>
                 <span>{pct}% · {hechas}/{ts.length}</span>

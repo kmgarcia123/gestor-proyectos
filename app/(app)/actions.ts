@@ -245,6 +245,9 @@ function avisarAsignacion(tareaId: string, nuevos: string[], quien: { nombre: st
 
 export async function eliminarTarea(id: string) {
   const { supabase } = await getContexto();
+  // Borra también los archivos adjuntos guardados en Storage.
+  const { data: archivos } = await supabase.from('adjuntos').select('ruta').eq('tarea_id', id);
+  if (archivos?.length) await supabase.storage.from('adjuntos').remove(archivos.map((a) => a.ruta));
   const { data } = await supabase.from('tareas').delete().eq('id', id).select('proyecto_id').single();
   if (data) revalidatePath(`/proyectos/${data.proyecto_id}`);
   revalidatePath('/');
