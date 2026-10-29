@@ -68,9 +68,9 @@ export default function EditorTexto({ id, valor, onCambio, placeholder }: { id: 
             <span className="flex flex-col items-center leading-none"><span className="text-sm font-bold">A</span><span className="mt-0.5 h-1 w-4 rounded bg-gradient-to-r from-red-600 via-azul to-turquesa" /></span>
           </Boton>
           {panel === 'color' && (
-            <div className="absolute left-0 top-9 z-10 grid grid-cols-4 gap-1.5 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+            <div className="absolute left-0 top-9 z-20 grid w-max grid-cols-4 gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg">
               {COLORES.map((c) => (
-                <button key={c} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => (cmd('foreColor', c), setPanel(null))} className="h-6 w-6 rounded-full ring-1 ring-black/10" style={{ background: c }} aria-label={`Color ${c}`} />
+                <button key={c} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => (cmd('foreColor', c), setPanel(null))} className="h-7 w-7 shrink-0 rounded-full ring-1 ring-black/10 transition hover:scale-110" style={{ background: c }} aria-label={`Color ${c}`} title={c} />
               ))}
             </div>
           )}
@@ -80,9 +80,9 @@ export default function EditorTexto({ id, valor, onCambio, placeholder }: { id: 
             <span className="rounded bg-yellow-200 px-1 text-sm font-bold">ab</span>
           </Boton>
           {panel === 'resaltar' && (
-            <div className="absolute left-0 top-9 z-10 flex gap-1.5 rounded-xl border border-slate-200 bg-white p-2 shadow-lg">
+            <div className="absolute left-0 top-9 z-20 flex w-max gap-2 rounded-xl border border-slate-200 bg-white p-2.5 shadow-lg">
               {RESALTADOS.map((c) => (
-                <button key={c} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => (cmd('hiliteColor', c), setPanel(null))} className="h-6 w-6 rounded-md ring-1 ring-black/10" style={{ background: c === 'transparent' ? 'repeating-linear-gradient(45deg,#fff,#fff 3px,#e2e8f0 3px,#e2e8f0 6px)' : c }} aria-label={c === 'transparent' ? 'Quitar resaltado' : `Resaltar ${c}`} />
+                <button key={c} type="button" onMouseDown={(e) => e.preventDefault()} onClick={() => (cmd('hiliteColor', c), setPanel(null))} className="h-7 w-7 shrink-0 rounded-md ring-1 ring-black/10 transition hover:scale-110" style={{ background: c === 'transparent' ? 'repeating-linear-gradient(45deg,#fff,#fff 3px,#e2e8f0 3px,#e2e8f0 6px)' : c }} aria-label={c === 'transparent' ? 'Quitar resaltado' : `Resaltar ${c}`} />
               ))}
             </div>
           )}
